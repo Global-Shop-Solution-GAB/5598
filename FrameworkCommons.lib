@@ -1,0 +1,904 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+
+''' Requirements
+
+Program.Sub.Require.Start
+'@ Arg Subname	: String = Name of the sub that is required.
+
+	Function.Intrinsic.Control.CallSub(CheckImplementationExists, "Subname", Variable.Args.Subname)
+	
+	Function.Intrinsic.Control.If(Variable.Args.ImplementationExists.Not)
+		
+		Function.Intrinsic.Control.Try
+			Function.Intrinsic.Control.CallSub(GetImplementationRequiredMessage, "Subname", Variable.Args.Subname)
+			Function.Intrinsic.Control.RaiseError(1, Variable.Args.ImplementationRequiredMessage)
+		
+		Function.Intrinsic.Control.Catch
+			Function.Intrinsic.Control.CallSub(ShowErrorAndEnd)
+		Function.Intrinsic.Control.EndTry
+	Function.Intrinsic.Control.EndIf
+Program.Sub.Require.End
+
+Program.Sub.CheckImplementationExists.Start
+'@ Arg Subname	: String = Name of the sub to check for
+'@ Return ImplementationExists	: Boolean = True if implementation found, false otherwise.
+
+	Function.Intrinsic.Control.CallSub(BuildImplementationsDictIfNotExists)
+	
+	'ImplementationExists
+	Variable.Local.ImplementationExists.Declare(Boolean, False)
+	Variable.Local.ImplementationExists.Set(Variable.Dictionary.Implementations![Variable.Args.Subname])
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ImplementationExists", Variable.Local.ImplementationExists)
+Program.Sub.CheckImplementationExists.End
+
+Program.Sub.BuildImplementationsDictIfNotExists.Start
+	Function.Intrinsic.Control.CallSub(CheckDictionaryExists, "DictionaryName", "Implementations")
+	Function.Intrinsic.Control.If(Variable.Args.DictionaryExists.Not)
+		Function.Intrinsic.Control.CallSub(BuildImplementationsDict)	
+	Function.Intrinsic.Control.EndIf
+Program.Sub.BuildImplementationsDictIfNotExists.End
+
+Program.Sub.BuildImplementationsDict.Start
+
+	'IncludedFiles
+	Variable.Local.IncludedFiles.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetIncludedFilepaths)
+	Function.Intrinsic.String.Split(Variable.Args.IncludedFiles, "*!*", Variable.Local.IncludedFiles)
+
+	'i
+	Variable.Local.i.Declare(Long)
+
+	Function.Intrinsic.Control.CallSub(InstantiateImplementationsDict)
+	
+	'For each included file
+	Function.Intrinsic.Control.For(Variable.Local.i, Variable.Local.IncludedFiles.LBound, Variable.Local.IncludedFiles.UBound, 1)	
+		Function.Intrinsic.Control.CallSub(GetSubsImplemented, "Filepath", Variable.Local.IncludedFiles(Variable.Local.i))
+		Function.Intrinsic.Control.CallSub(AddDelimitedListToDict, "List", Variable.Args.SubsImplemented, "Delimiter", "*!*", "DictionaryName", "Implementations", "IgnoreDuplicates", True)
+	Function.Intrinsic.Control.Next(Variable.Local.i)
+Program.Sub.BuildImplementationsDict.End
+
+Program.Sub.InstantiateImplementationsDict.Start
+	Function.Data.Dictionary.Create("Implementations")
+	Function.Data.Dictionary.SetDefaultReturn(Implementations, "False")
+Program.Sub.InstantiateImplementationsDict.End
+
+Program.Sub.GetIncludedFilepaths.Start
+'@ Return IncludedFiles	: String = *!* delimited string of full paths for all libraries and current running script
+	
+	'DirectoryPath = \\path\to\script\directory\{0}
+	Variable.Local.DirectoryPath.Declare(String, "{0}{1}")
+	Function.Intrinsic.String.Build(Variable.Local.DirectoryPath, Variable.Ambient.ScriptPath, "\{0}", Variable.Local.DirectoryPath)
+
+	'LibFiles
+	Variable.Local.LibFiles.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetImportedFilesFromScriptFile, "FilePath", Variable.Caller.ScriptFile)
+	
+	'FileList
+	Variable.Local.FileList.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetCurrentScriptName)
+	Function.Intrinsic.String.Concat(Variable.Args.CurrentScriptName, "*!*", Variable.Args.ImportedFiles, Variable.Local.FileList)
+	Function.Intrinsic.String.Split(Variable.Local.FileList, "*!*", Variable.Local.FileList)
+
+	'i
+	Variable.Local.i.Declare(Long)
+
+	Function.Intrinsic.Control.For(Variable.Local.i, Variable.Local.FileList.LBound, Variable.Local.FileList.UBound, 1)
+		Function.Intrinsic.String.Build(Variable.Local.DirectoryPath, Variable.Local.FileList(Variable.Local.i), Variable.Local.FileList(Variable.Local.i))
+	Function.Intrinsic.Control.Next(Variable.Local.i)
+
+	Function.Intrinsic.String.Join(Variable.Local.FileList, "*!*", Variable.Local.FileList)
+
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("IncludedFiles", Variable.Local.FileList)
+Program.Sub.GetIncludedFilepaths.End
+
+Program.Sub.GetImportedFilesFromScriptFile.Start
+'@ Arg FilePath	: String
+'@ Return ImportedFiles	: String = *!* delimited list of "someFile.lib*!*someOtherFile.lib"
+	
+	'LibFiles
+	Variable.Local.LibFiles.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetPreflightLinesFromFile, "FilePath", Variable.Args.FilePath)
+	Function.Intrinsic.Control.CallSub(GetImportLinesFromPreflightLines, "PreflightLines", Variable.Args.PreflightLines)
+	Function.Intrinsic.Control.CallSub(GetLibFilesFromImportLines, "ImportLines", Variable.Args.ImportLines)
+	Variable.Local.LibFiles.Set(Variable.Args.LibFiles)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ImportedFiles", Variable.Local.LibFiles)
+Program.Sub.GetImportedFilesFromScriptFile.End
+
+Program.Sub.GetPreflightLinesFromFile.Start
+'@ Arg FilePath	: String
+'@ Return	PreflightLines	: String = *!* delimited list of all liens inside preflight
+
+	'PreflightLines
+	Variable.Local.PreflightLines.Declare(String)
+
+	'FileLines
+	Variable.Local.FileLines.Declare(String)
+	Function.Intrinsic.File.FileToStringArray(Variable.Args.FilePath, Variable.Ambient.NewLine, Variable.Local.FileLines)
+
+	'ParseState = waiting, active, complete
+	Variable.Local.ParseState.Declare(String, "waiting")
+	
+	'i
+	Variable.Local.i.Declare(Long)
+	
+	'CurrentLine
+	Variable.Local.CurrentLine.Declare(String)
+
+	Function.Intrinsic.Control.For(Variable.Local.i, Variable.Local.FileLines.LBound, Variable.Local.FileLines.UBound, 1)
+		Variable.Local.CurrentLine.Set(Variable.Local.FileLines(Variable.Local.i))
+		
+		Function.Intrinsic.Control.SelectCase(Variable.Local.ParseState.lower)
+		
+		'waiting
+		Function.Intrinsic.Control.Case("waiting")
+			Function.Intrinsic.Control.CallSub(GetSubstringExists, "Haystack", Variable.Local.CurrentLine.lower, "Needle", "sub.preflight.start")
+			Function.Intrinsic.Control.If(Variable.Args.SubstringExists)
+				Variable.Local.ParseState.Set("active")
+			Function.Intrinsic.Control.EndIf
+		
+		'active
+		Function.Intrinsic.Control.Case("active")			
+			Function.Intrinsic.Control.CallSub(GetSubstringExists, "Haystack", Variable.Local.CurrentLine.lower, "Needle", "sub.preflight.end")
+			Function.Intrinsic.Control.If(Variable.Args.SubstringExists)
+				Variable.Local.ParseState.Set("complete")
+			Function.Intrinsic.Control.Else
+			
+				Function.Intrinsic.String.Concat(Variable.Local.PreflightLines, "*!*", Variable.Local.CurrentLine, Variable.Local.PreflightLines)
+			Function.Intrinsic.Control.EndIf
+		
+		'complete
+		Function.Intrinsic.Control.Case("complete")
+			Function.Intrinsic.String.TrimChar(Variable.Local.PreflightLines, "**!*!", Variable.Local.PreflightLines)
+			Function.Intrinsic.Control.ExitFor(Variable.Local.i)
+		
+		'else
+		Function.Intrinsic.Control.CaseElse
+			'Todo: Throw error
+		Function.Intrinsic.Control.EndSelect
+	Function.Intrinsic.Control.Next(Variable.Local.i)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("PreflightLines", Variable.Local.PreflightLines)
+Program.Sub.GetPreflightLinesFromFile.End
+
+Program.Sub.GetImportLinesFromPreflightLines.Start
+'@ Arg PreflightLines	: String = *!* delimited list of all lines inside preflight
+'@ Return ImportLines	: String = *!* delimited list of uppercase import lines. Ex: "Program.External.Include.Library("someFile.lib")*!*Program.External.Include.Library("someOtherFile.lib")"
+	
+	'PreflightLines
+	Variable.Local.PreflightLines.Declare(String)
+	Function.Intrinsic.String.Split(Variable.Args.PreflightLines, "*!*", Variable.Local.PreflightLines)
+
+	'ImportLines
+	Variable.Local.ImportLines.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetDictionary, "NameSeed", "ImportLines")
+
+	'i
+	Variable.Local.i.Declare(Long)
+
+	'CurrentLine
+	Variable.local.CurrentLine.Declare(String)
+
+	Function.Intrinsic.Control.For(v.local.i, Variable.Local.PreflightLines.LBound, Variable.Local.PreflightLines.UBound, 1)
+		Variable.local.CurrentLine.Set(Variable.Local.PreflightLines(v.local.i))
+		
+		Function.Intrinsic.Control.CallSub(GetLineIsComment, Line, Variable.local.CurrentLine)
+		Function.Intrinsic.Control.If(Variable.Args.LineIsComment.Not)
+			
+			Function.Intrinsic.Control.CallSub(GetSubstringExists, "Haystack", Variable.local.CurrentLine.LCase, "Needle", "include.library(")
+			
+			Function.Intrinsic.Control.If(Variable.Args.SubstringExists)
+				Function.Data.Dictionary.AddItem(Variable.Args.DictionaryName, Variable.local.CurrentLine, Variable.local.CurrentLine, True)
+			Function.Intrinsic.Control.EndIf	
+		Function.Intrinsic.Control.EndIf
+
+	Function.Intrinsic.Control.Next(v.local.i)
+	
+	Function.Intrinsic.Control.CallSub(GetKeysFromDictionary, "DictionaryName", Variable.Args.DictionaryName)
+	Variable.Local.ImportLines.Set(Variable.Args.KeysFromDictionary)
+	Function.Data.Dictionary.Close(Variable.Args.DictionaryName)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ImportLines", Variable.Local.ImportLines)
+Program.Sub.GetImportLinesFromPreflightLines.End
+
+Program.Sub.GetLineIsComment.Start
+'@ Arg Line	: String
+'@ Return LineIsComment	: Boolean
+	
+	'Line
+	Variable.Local.Line.Declare(String, "")
+	' Variable.Local.Line.Set(v.Args.Line)
+	Function.Intrinsic.String.TrimCharL(v.Args.Line, " *!*	", Variable.Local.Line)
+	
+	'LineIsComment
+	Variable.Local.LineIsComment.Declare(Boolean, False)
+	Function.Intrinsic.Control.If(Variable.Local.Line.Left1, =, "'")
+		Variable.Local.LineIsComment.Set(True)
+	Function.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("LineIsComment", Variable.Local.LineIsComment)
+Program.Sub.GetLineIsComment.End
+
+Program.Sub.GetSubstringExists.Start
+'@ Arg Haystack	: String = the text to be searched
+'@ Arg Needle	: String = case insensitive text to be found
+'@ Return SubstringExists	: Boolean
+
+	'Occurences
+	Variable.Local.Occurences.Declare(Long, 0)
+	Function.Intrinsic.Control.If(Variable.Args.Needle, !=, "")
+		Function.Intrinsic.String.Occurs(Variable.Args.Haystack, Variable.Args.Needle, Variable.Local.Occurences)
+	Function.Intrinsic.Control.EndIf	
+
+	'SubstringExists
+	Variable.Local.SubstringExists.Declare(Boolean, False)
+	Function.Intrinsic.Control.If(Variable.Local.Occurences, >, 0)
+		Variable.Local.SubstringExists.Set(True)
+	Function.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("SubstringExists", Variable.Local.SubstringExists)
+Program.Sub.GetSubstringExists.End
+
+Program.Sub.GetLibFilesFromImportLines.Start
+'@ Arg ImportLines	: String = *!* delimited list of "Program.External.Include.Library("someFile.lib")*!*Program.External.Include.Library("someOtherFile.lib")"
+'@ Return LibFiles	: String = *!* delimited list of "someFile.lib*!*someOtherFile.lib"
+	
+	'LibFiles
+	Variable.Local.LibFiles.Declare(String, "")
+
+	'i
+	Variable.Local.i.Declare(Long, 0)
+
+	Function.Intrinsic.Control.If(Variable.Args.ImportLines.IsNullOrWhitespace, =, False)
+	
+		Function.Intrinsic.String.Split(Variable.Args.ImportLines, "*!*", Variable.Local.LibFiles)
+
+		Function.Intrinsic.Control.For(Variable.Local.i, Variable.Local.LibFiles.LBound, Variable.Local.LibFiles.UBound, 1)
+			Function.Intrinsic.Control.CallSub(GetFileNameFromImportLine, "ImportLine", Variable.Local.LibFiles(Variable.Local.i))
+			Variable.Local.LibFiles(Variable.Local.i).Set(Variable.Args.FileName)
+		Function.Intrinsic.Control.Next(Variable.Local.i)
+
+		Function.Intrinsic.String.Join(Variable.Local.LibFiles, "*!*", Variable.Local.LibFiles)
+	Function.Intrinsic.Control.EndIf
+	
+	'Return
+	Function.Intrinsic.Variable.AddRV("LibFiles", Variable.Local.LibFiles)
+Program.Sub.GetLibFilesFromImportLines.End
+
+Program.Sub.GetFileNameFromImportLine.Start
+'@ Arg ImportLine	: String = ex. Program.External.Include.Library("someFile.lib")
+'@ Return FileName	: String = ex. someFile.lib
+
+	'FileName
+	Variable.Local.FileName.Declare(String, "")
+	
+	Function.Intrinsic.Control.If(Variable.Args.ImportLine.IsNullOrWhitespace, =, False)
+	
+		'Get text inside parentheses
+		Function.Intrinsic.String.Split(Variable.Args.ImportLine, "(", Variable.Local.FileName)
+		Function.Intrinsic.String.Split(Variable.Local.FileName(1), ")", Variable.Local.FileName)
+
+		'Remove quotation marks if exist
+		Function.Intrinsic.String.TrimChar(Variable.Local.FileName(0), Variable.Ambient.DblQuote, Variable.Local.FileName)
+	Function.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("FileName", Variable.Local.FileName)
+
+Program.Sub.GetFileNameFromImportLine.End
+
+Program.Sub.GetImplementationRequiredMessage.Start
+'@ Arg Subname	: String = Name of the missing
+'@ Return ImplementationRequiredMessage	: String
+
+	v.Local.Message.Declare(String, "{0}{0}A required subprocess is not implemented: {1}")
+	Function.Intrinsic.String.Build(v.Local.Message, Variable.Ambient.NewLine, v.Args.Subname, v.Local.Message)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ImplementationRequiredMessage", v.Local.Message)
+Program.Sub.GetImplementationRequiredMessage.End
+
+Program.Sub.GetSubsImplemented.Start
+'@ Arg Filepath	: String
+'@ Return SubsImplemented	: String = *!* delimited list containing the subs implemented in the file
+
+	'Lines
+	Variable.Local.Lines.Declare(String)
+	Function.Intrinsic.File.FileToStringArray(Variable.Args.Filepath, Variable.Ambient.NewLine, Variable.Local.Lines)
+
+	'SubsImplemented
+	Variable.Local.SubsImplemented.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetDictionary, "NameSeed", "ImplementedSubs")
+
+	Variable.Local.i.Declare(Long)
+	
+	Function.Intrinsic.Control.For(Variable.Local.i, Variable.Local.Lines.LBound, Variable.Local.Lines.UBound, 1)
+		Function.Intrinsic.Control.CallSub(AddImplementationToDict, "Line", Variable.Local.Lines(Variable.Local.i), "DictionaryName", Variable.Args.DictionaryName)
+	Function.Intrinsic.Control.Next(Variable.Local.i)
+	
+	Function.Intrinsic.Control.CallSub(GetKeysFromDictionary, "DictionaryName", Variable.Args.DictionaryName)
+	Variable.Local.SubsImplemented.Set(Variable.Args.KeysFromDictionary)
+	Function.Data.Dictionary.Close(Variable.Args.DictionaryName)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("SubsImplemented", Variable.Local.SubsImplemented)
+Program.Sub.GetSubsImplemented.End
+
+Program.Sub.AddImplementationToDict.Start
+'@ Arg Line	: String
+'@ Arg DictionaryName	: String
+
+	Function.Intrinsic.Control.CallSub(GetLineIsSubStart, "Line", Variable.Args.Line)
+	Function.Intrinsic.Control.If(Variable.Args.LineIsSubStart)
+		
+		'Extract just the name of the sub from the line
+		Function.Intrinsic.Control.CallSub(GetSubNameFromSubStartLine, "StartLine", Variable.Args.Line)
+		
+		Function.Data.Dictionary.AddItem(Variable.Args.DictionaryName, Variable.Args.SubName, Variable.Args.SubName)
+	Function.Intrinsic.Control.EndIf
+Program.Sub.AddImplementationToDict.End
+
+Program.Sub.AddDelimitedListToDict.Start
+'@ Arg List	: String
+'@ Arg Delimiter	: String
+'@ Arg DictionaryName	: String
+'@ Arg IgnoreDuplicates	: Boolean
+	
+	'List
+	Variable.Local.List.Declare(String)
+	Function.Intrinsic.String.Split(Variable.Args.List, Variable.Args.Delimiter, Variable.Local.List)
+
+	'CurrentItem
+	Variable.Local.CurrentItem.Declare(String)
+
+	'i
+	Variable.Local.i.Declare(Long, 0)
+
+	Function.Intrinsic.Control.If(Variable.Args.List.IsNullOrWhitespace, =, False)
+		Function.Intrinsic.Control.For(Variable.Local.i, Variable.Local.List.LBound, Variable.Local.List.UBound, 1)
+			Variable.Local.CurrentItem.Set(Variable.Local.List(Variable.Local.i))
+			
+			'Add current item to dictionary with default key of True
+			Function.Data.Dictionary.AddItem(Variable.Args.DictionaryName, Variable.Local.CurrentItem, True, Variable.Args.IgnoreDuplicates)
+		Function.Intrinsic.Control.Next(Variable.Local.i)
+	Function.Intrinsic.Control.EndIf
+Program.Sub.AddDelimitedListToDict.End
+
+Program.Sub.GetCurrentScriptName.Start
+'@ Return CurrentScriptName	: String = Filename of the currently running script
+
+	'ScrapText
+	Variable.Local.ScrapText.Declare(String)
+	Function.Intrinsic.String.Concat(Variable.Ambient.ScriptPath, "\", Variable.Local.ScrapText)
+
+	'ScriptName
+	Variable.Local.ScriptName.Declare(String)
+	Variable.Local.ScriptName.Set(Variable.Caller.ScriptFile)
+	Function.Intrinsic.String.Replace(Variable.Local.ScriptName, Variable.Local.ScrapText, "",  Variable.Local.ScriptName)
+	'Return
+	Function.Intrinsic.Variable.AddRV("CurrentScriptName", Variable.Local.ScriptName)
+Program.Sub.GetCurrentScriptName.End
+
+Program.Sub.GetLineIsSubStart.Start
+'@ Arg Line	: String
+'@ Return LineIsSubStart	: Boolean
+
+	'Matches = delimited list of matches and starting indexes. ex. 0*!*matchtext@!@3*!*othermatchtext
+	Variable.Local.Matches.Declare(String)
+	Function.Intrinsic.String.RegExMatch(Variable.Args.Line, "^\s*program\.sub\.(\w+)\.start\s*$", True, Variable.Local.Matches)
+	
+	'LineIsSubStart
+	Variable.Local.LineIsSubStart.Declare(Boolean, False)
+	Function.Intrinsic.Control.If(Variable.Local.Matches.IsNullOrWhitespace, =, false)
+		Variable.Local.LineIsSubStart.Set(True)
+	Function.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("LineIsSubStart", Variable.Local.LineIsSubStart)
+Program.Sub.GetLineIsSubStart.End
+
+Program.Sub.GetSubNameFromSubStartLine.Start
+'@ Arg StartLine	: String
+'@ Return SubName	: String = Case preserved name of the sub if regex matched, else an empty string.
+
+	Variable.Local.SubName.Declare(String, "")
+
+	'Capture = delimited string of index and match. ex. 0*!*matchtext
+	Variable.Local.Capture.Declare(String)
+	Function.Intrinsic.String.RegExMatch(Variable.Args.StartLine, "^\s*program\.sub\.(\w+)\.start\s*$", True, Variable.Local.Capture)
+	
+	'If regex matched
+	Function.Intrinsic.Control.If(Variable.Local.Capture.IsNullOrWhitespace, =, False)
+		Function.Intrinsic.String.Split(Variable.Local.Capture, "*!*", Variable.Local.Capture)
+		Function.Intrinsic.String.Split(Variable.Local.Capture(1), ".", Variable.Local.Capture)	
+		Variable.Local.SubName.Set(Variable.Local.Capture(2))
+	Function.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("SubName", Variable.Local.SubName)
+Program.Sub.GetSubNameFromSubStartLine.End
+
+
+''' Dictionaries
+
+Program.Sub.GetDictionary.Start
+'@ Arg NameSeed	: String = Seed to use for getting a unique dictionary name
+'@ Return DictionaryName	: String
+
+	'AvailableDictionaryName
+	Variable.Local.AvailableDictionaryName.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetAvailableDictionaryName, "Seed", Variable.Args.NameSeed)
+	Variable.Local.AvailableDictionaryName.Set(Variable.Args.AvailableDictionaryName)
+
+	Function.Data.Dictionary.Create(Variable.Local.AvailableDictionaryName)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("DictionaryName", Variable.Local.AvailableDictionaryName)
+Program.Sub.GetDictionary.End
+
+Program.Sub.GetAvailableDictionaryName.Start
+'@ Arg Seed	: String = String to use for getting a unique dictionary name
+'@ Return AvailableDictionaryName	: String
+
+	'DictionaryName
+	Variable.Local.DictionaryName.Declare(String)
+	Variable.Local.DictionaryName.Set(Variable.Args.Seed)
+
+	'NameExists
+	Variable.Local.NameExists.Declare(Boolean)
+	Function.Data.Dictionary.Exists(Variable.Local.DictionaryName, Variable.Local.NameExists)
+
+	'Counter
+	Variable.Local.Counter.Declare(Long, 0)
+
+	Function.Intrinsic.Control.DoUntil(Variable.Local.NameExists.Not)
+
+		Function.Intrinsic.Math.Add(Variable.Local.Counter, 1, Variable.Local.Counter)
+		Function.Intrinsic.String.Concat(Variable.Args.Seed, Variable.Local.Counter, Variable.Local.DictionaryName)		
+
+		Function.Data.Dictionary.Exists(Variable.Local.DictionaryName, Variable.Local.NameExists)
+	Function.Intrinsic.Control.Loop
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("AvailableDictionaryName", Variable.Local.DictionaryName)
+Program.Sub.GetAvailableDictionaryName.End
+
+Program.Sub.GetKeysFromDictionary.Start
+'@ Arg DictionaryName	: String
+'@ Return KeysFromDictionary	: String = *!* delimited list of keys from the dictionary.
+
+	'KeysAndValues
+	Variable.Local.KeysAndValues.Declare(String)
+	Function.Data.Dictionary.ReturnAllPairs(Variable.Args.DictionaryName, Variable.Local.KeysAndValues)
+	
+	'Keys
+	Variable.Local.Keys.Declare(String, "")
+	Function.Intrinsic.Control.If(Variable.Local.KeysAndValues.IsNoReturn, =, False)
+		Function.Intrinsic.String.Split(Variable.Local.KeysAndValues, "!*!", Variable.Local.Keys)	
+	Function.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("KeysFromDictionary", Variable.Local.Keys)
+Program.Sub.GetKeysFromDictionary.End
+
+Program.Sub.CheckDictionaryExists.Start
+'@ Arg DictionaryName	: String
+'@ Return DictionaryExists	: Boolean
+
+	'DictionaryExists
+	Variable.Local.DictionaryExists.Declare(Boolean, False)
+	Function.Data.Dictionary.Exists(Variable.Args.DictionaryName, Variable.Local.DictionaryExists)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("DictionaryExists", Variable.Local.DictionaryExists)
+Program.Sub.CheckDictionaryExists.End
+
+
+''' DataTables
+
+Program.Sub.BuildDataTableFromCompanyDB.Start	
+'@ Arg Query	: String
+'@ Arg DataTableName	: String
+
+	Function.Intrinsic.Control.CallSub(OpenCompanyDB)
+	Function.Intrinsic.Control.CallSub(BuildDataTable,"sDtName", Variable.Args.DataTableName, "sConName", "CompanyDB", "sQuery", Variable.Args.Query)
+	Function.Intrinsic.Control.CallSub(CloseCompanyDB)
+Program.Sub.BuildDataTableFromCompanyDB.End
+
+Program.Sub.BuildDataTableFromCommonDB.Start
+'@ Arg Query	: String
+'@ Arg DataTableName	: String
+
+	Function.Intrinsic.Control.CallSub(OpenCommonDB)
+	Function.Intrinsic.Control.CallSub(BuildDataTable,"sDtName", Variable.Args.DataTableName, "sConName", "CommonDB", "sQuery", Variable.Args.Query)
+	Function.Intrinsic.Control.CallSub(CloseCommonDB)
+Program.Sub.BuildDataTableFromCommonDB.End
+
+Program.Sub.RebuildDataTableFromCompanyDB.Start	
+'@ Arg Query	: String
+'@ Arg DataTableName	: String
+
+	f.Intrinsic.Control.If(v.DataTable.[Variable.Args.DataTableName].Exists)	
+		f.Data.DataTable.Close(Variable.Args.DataTableName)
+	f.Intrinsic.Control.EndIf
+
+	Function.Intrinsic.Control.CallSub(BuildDataTableFromCompanyDB, "Query", Variable.Args.Query, "DataTableName", Variable.Args.DataTableName)
+Program.Sub.RebuildDataTableFromCompanyDB.End
+
+Program.Sub.RebuildDataTableFromCommonDB.Start	
+'@ Arg Query	: String
+'@ Arg DataTableName	: String
+
+	f.Intrinsic.Control.If(v.DataTable.[Variable.Args.DataTableName].Exists)	
+		f.Data.DataTable.Close(Variable.Args.DataTableName)
+	f.Intrinsic.Control.EndIf
+	
+	Function.Intrinsic.Control.CallSub(BuildDataTableFromCommonDB, "Query", Variable.Args.Query, "DataTableName", Variable.Args.DataTableName)
+Program.Sub.RebuildDataTableFromCommonDB.End
+
+Program.Sub.ReloadDataTableFromCompanyDB.Start
+	Function.Intrinsic.Control.CallSub(OpenCompanyDB)
+	Function.Intrinsic.Control.CallSub(ReloadDataTable, "sConName", "CompanyDB", "sDtName", Variable.Args.DataTableName, "sQuery", Variable.Args.Query)
+	Function.Intrinsic.Control.CallSub(CloseCompanyDB)
+Program.Sub.ReloadDataTableFromCompanyDB.End
+
+Program.Sub.ReloadDataTableFromCommonDB.Start
+	Function.Intrinsic.Control.CallSub(OpenCommonDB)
+	Function.Intrinsic.Control.CallSub(ReloadDataTable, "sConName", "CommonDB", "sDtName", Variable.Args.DataTableName, "sQuery", Variable.Args.Query)
+	Function.Intrinsic.Control.CallSub(CloseCommonDB)
+Program.Sub.ReloadDataTableFromCommonDB.End
+
+Program.Sub.ReloadDataTable.Start
+'@ Arg sDtName	: String = Name of the datatable to reload
+'@ Arg sConName	: String = Name of db connection
+'@ Arg sQuery	: String = Query to use
+
+	'sTempName = default name of the temporary datatable.
+	Variable.Local.sTempName.Declare(String, "dtRefresh{0}")
+	Function.Intrinsic.String.Build(Variable.Local.sTempName, Variable.Args.sDtName, Variable.Local.sTempName)
+	
+	'Get first available name like dtRefresh{v.args.sDtName} for temporary datatable.
+	Function.Intrinsic.Control.CallSub(GetAvailableDatatableName, "Seed", Variable.Local.sTempName)
+	Variable.Local.sTempName.Set(Variable.Args.AvailableDatatableName)
+
+	'build temp table
+	Function.Intrinsic.Control.CallSub(BuildDataTable, "sDtName", Variable.Local.sTempName, "sConName", Variable.Args.sConName, "sQuery", Variable.Args.sQuery)
+	'delete row main table
+	Function.Data.DataTable.DeleteRow(Variable.Args.sDtName)
+	'merge tables
+	Function.Data.DataTable.Merge(Variable.Local.sTempName, Variable.Args.sDtName, false, 4)
+	'close temp table
+	Function.Data.DataTable.Close(Variable.Local.sTempName)
+	'Accept changes to sDtName
+	Function.Data.DataTable.AcceptChanges(Variable.Args.sDtName)
+
+Program.Sub.ReloadDataTable.End
+
+Program.Sub.GetAvailableDatatableName.Start
+'@ Arg Seed	: String = Seed for the name of the datatable
+'@ Return AvailableDatatableName	: String = First available name similar to the seed given
+
+	'DatatableName
+	Variable.Local.DatatableName.Declare(String, "")
+
+	'Counter
+	Variable.Local.Counter.Declare(Long, 0)
+
+	Function.Intrinsic.Control.If(Variable.Args.Seed.IsNullOrWhitespace, =, False)
+		Variable.Local.DatatableName.Set(Variable.Args.Seed)
+		
+		f.Intrinsic.Control.DoUntil(Variable.DataTable.[Variable.Local.DataTableName].Exists, =, False)
+			Function.Intrinsic.Math.Add(Variable.Local.Counter, 1, Variable.Local.Counter)
+			Function.Intrinsic.String.Concat(Variable.Args.Seed, Variable.Local.Counter, Variable.Local.DatatableName)
+		f.Intrinsic.Control.Loop
+	Function.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("AvailableDatatableName", Variable.Local.DatatableName)
+Program.Sub.GetAvailableDatatableName.End
+
+Program.Sub.BuildDataTable.Start
+'@ Arg sDtName	: String = Name of datatable to create
+'@ Arg sConName	: String = Name of db connection
+'@ Arg sQuery	: String = Query to use
+
+	Function.Intrinsic.Control.Try
+		Function.Data.DataTable.CreateFromSQL(Variable.Args.sDtName, Variable.Args.sConName, Variable.Args.sQuery, True)
+	Function.Intrinsic.Control.Catch
+		Function.Intrinsic.Control.CallSub(ShowErrorAndEnd)
+	Function.Intrinsic.Control.EndTry
+Program.Sub.BuildDataTable.End
+
+Program.Sub.DeleteRowsFromDataTable.Start
+'@ Arg sDtName	: String
+'@ Arg sRowIds	: String = *!* delimited string of row indices to delete.
+
+	'iCount
+	Variable.Local.iCount.Declare(Long, 0)
+
+	'iCurrent
+	Variable.Local.iCurrent.Declare(Long, 0)
+
+	'sRowIds, sort highest index first
+	Variable.Local.sRowIds.Declare(String)
+	Function.Intrinsic.String.Split(Variable.Args.sRowIds, "*!*", Variable.Local.sRowIds)
+	Function.Intrinsic.Variable.Sort(Variable.Local.sRowIds, True, Variable.Local.sRowIds)
+	
+	Function.Intrinsic.Control.For(Variable.Local.iCount, 0, Variable.Local.sRowIds.Ubound, 1)
+
+		'if element is not null or empty
+		Function.Intrinsic.Control.If(Variable.Local.sRowIds(Variable.Local.iCount), !=, "")
+		Function.Intrinsic.Control.AndIf(Variable.Local.sRowIds(Variable.Local.iCount), !=, Variable.Ambient.DbNull)
+			
+			Variable.Local.iCurrent.Set(Variable.Local.sRowIds(Variable.Local.iCount).Long)			
+			Function.Data.DataTable.DeleteRow(Variable.Args.sDtName, Variable.Local.iCurrent)
+		Function.Intrinsic.Control.EndIf
+
+	Function.Intrinsic.Control.Next(Variable.Local.iCount)
+Program.Sub.DeleteRowsFromDataTable.End
+
+Program.Sub.TryCloseDataTable.Start
+'@ Arg sDtName	:	String = The Name of the datatable being closed
+
+	Function.Intrinsic.Control.Try
+		F.Data.Datatable.Close(Variable.Args.sDtName)	
+	Function.Intrinsic.Control.Catch
+	Function.Intrinsic.Control.EndTry
+Program.Sub.TryCloseDataTable.end
+
+
+''' Connections
+
+Program.Sub.OpenCommonDB.Start
+	Function.Intrinsic.Control.CallSub(OpenConnection, "sConnectionName", "CommonDB")
+Program.Sub.OpenCommonDB.End
+
+Program.Sub.OpenCompanyDB.Start
+	Function.Intrinsic.Control.CallSub(OpenConnection, "sConnectionName", "CompanyDB")
+Program.Sub.OpenCompanyDB.End
+
+Program.Sub.OpenConnection.Start
+'@ Arg sConnectionName
+	'Todo: When octsrs is able, replace selectCase with parameterized open statement.
+
+	Function.Intrinsic.Control.SelectCase(Variable.Args.sConnectionName.LCase)
+		'Common
+		Function.Intrinsic.Control.Case("commondb")
+			Function.Intrinsic.Control.Try
+				Function.ODBC.Connection!CommonDB.OpenCommonConnection		
+			Function.Intrinsic.Control.Catch
+			Function.Intrinsic.Control.EndTry
+		'Company
+		Function.Intrinsic.Control.Case("companydb")
+			Function.Intrinsic.Control.Try
+				Function.ODBC.Connection!CompanyDB.OpenCompanyConnection		
+			Function.Intrinsic.Control.Catch
+			Function.Intrinsic.Control.EndTry
+		'Else
+		Function.Intrinsic.Control.CaseElse		
+	Function.Intrinsic.Control.EndSelect
+Program.Sub.OpenConnection.End
+
+Program.Sub.CloseCommonDB.Start
+	Function.Intrinsic.Control.CallSub(CloseConnection, "sConnectionName", "CommonDB")
+Program.Sub.CloseCommonDB.End
+
+Program.Sub.CloseCompanyDB.Start
+	Function.Intrinsic.Control.CallSub(CloseConnection, "sConnectionName", "CompanyDB")
+Program.Sub.CloseCompanyDB.End
+
+Program.Sub.CloseConnection.Start
+'@ Arg sConnectionName
+	'Todo: When octsrs is able, replace selectCase with parameterized close statement.
+
+	Function.Intrinsic.Control.SelectCase(Variable.Args.sConnectionName.LCase)
+		'Common
+		Function.Intrinsic.Control.Case("commondb")
+			Function.Intrinsic.Control.Try
+				Function.ODBC.Connection!CommonDB.Close		
+			Function.Intrinsic.Control.Catch
+			Function.Intrinsic.Control.EndTry
+		'Company
+		Function.Intrinsic.Control.Case("companydb")
+			Function.Intrinsic.Control.Try
+				Function.ODBC.Connection!CompanyDB.Close		
+			Function.Intrinsic.Control.Catch
+			Function.Intrinsic.Control.EndTry
+		'Else
+		Function.Intrinsic.Control.CaseElse		
+	Function.Intrinsic.Control.EndSelect
+Program.Sub.CloseConnection.End
+
+Program.Sub.TryCloseCompanyDB.Start
+	Function.Intrinsic.Control.CallSub(TryCloseConnection, "ConnectionName", "CompanyDB")
+Program.Sub.TryCloseCompanyDB.End
+
+Program.Sub.TryCloseCommonDB.Start
+	Function.Intrinsic.Control.CallSub(TryCloseConnection, "ConnectionName", "CommonDB")
+Program.Sub.TryCloseCommonDB.End
+
+Program.Sub.TryCloseConnection.Start
+'@Arg ConnectionName	: String = Name of the connection to try to close.
+'								Currently must be either companydb or commondb.
+
+	Function.Intrinsic.Control.Try
+		'Todo: Replace select case with parameterization when OCTSRS can handle it.
+		Function.Intrinsic.Control.SelectCase(Variable.Args.ConnectionName.lcase)
+		
+		'CompanyDB
+		Function.Intrinsic.Control.Case("companydb")
+			Function.ODBC.Connection!CompanyDB.Close
+		
+		'CommonDB
+		Function.Intrinsic.Control.Case("commondb")
+			Function.ODBC.Connection!CommonDB.Close
+		
+		Function.Intrinsic.Control.CaseElse
+			'Connection not found
+		Function.Intrinsic.Control.EndSelect
+	
+	Function.Intrinsic.Control.Catch
+		'
+	Function.Intrinsic.Control.EndTry
+Program.Sub.TryCloseConnection.End
+
+
+''' Filesystem
+
+Program.Sub.LaunchFileIfExists.Start
+'@ Arg filePath	: String
+
+	Function.Intrinsic.Control.CallSub(CheckFileExists, "filePath", Variable.Args.filePath)
+	Function.Intrinsic.Control.If(Variable.Args.FileExists)
+		Function.Intrinsic.Control.CallSub(LaunchFile, "filePath", Variable.Args.FilePath)
+	Function.Intrinsic.Control.EndIf
+
+Program.Sub.LaunchFileIfExists.End
+
+Program.Sub.LaunchFile.Start
+'@ Arg filePath	: String
+
+	Function.Intrinsic.Control.Try
+		F.Intrinsic.Task.ShellExec(0,"",V.Args.FilePath,"","",1)	
+	Function.Intrinsic.Control.Catch
+		Function.Intrinsic.Control.CallSub(ShowError)
+	Function.Intrinsic.Control.EndTry
+Program.Sub.LaunchFile.End
+
+Program.Sub.CheckFileExists.Start
+'@ Arg FilePath	: String
+'@ Return FileExists	:Boolean
+	
+	'FileExists
+	Variable.Local.FileExists.Declare(Boolean, False)
+	Function.Intrinsic.File.Exists(Variable.Args.filePath, Variable.Local.FileExists)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("FileExists", Variable.Local.FileExists)
+Program.Sub.CheckFileExists.End
+
+Program.Sub.CheckExcelIsPresent.Start
+'@ Return ExcelIsPresent	: Boolean = True if Excel is installed, false otherwise.
+
+	'ExcelIsPresent
+	Variable.Local.ExcelIsPresent.Declare(Boolean, False)
+	F.Automation.MSExcel.CheckPresence(Variable.Local.ExcelIsPresent)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ExcelIsPresent", Variable.Local.ExcelIsPresent)
+Program.Sub.CheckExcelIsPresent.End
+
+
+''' External Commands
+
+Program.Sub.LaunchGssWebsite.Start
+	F.Intrinsic.Control.Try
+		F.Intrinsic.Task.ShellExec(0,"Open","http://www.globalshopsolutions.com/login-customer","","",0)
+	F.Intrinsic.Control.Catch
+		Function.Intrinsic.Control.CallSub(ShowError)
+	F.Intrinsic.Control.EndTry
+Program.Sub.LaunchGssWebsite.End
+
+
+''' Errors
+
+Program.Sub.ShowErrorAndEnd.Start
+	Function.Intrinsic.Control.CallSub(ShowError, "sSubName", Variable.Ambient.SubroutineCalledFrom)
+	
+	'End Program
+	Function.Intrinsic.Control.End
+Program.Sub.ShowErrorAndEnd.End
+
+Program.Sub.ShowError.Start
+'@ Optional Arg sSubName	: String = Name of sub to display in message
+	
+	'bArgExists
+	Variable.Local.bArgExists.Declare(Boolean, False)
+	Function.Intrinsic.Variable.ArgExists("sSubName", Variable.Local.bArgExists)
+
+	'sSubName
+	Variable.Local.sSubName.Declare(String)
+	Function.Intrinsic.Control.IIF(Variable.Local.bArgExists, =, True, Variable.Args.sSubName, Variable.Ambient.SubroutineCalledFrom, Variable.Local.sSubName)
+
+	'sError
+	Variable.Local.sError.Declare(String)
+	Function.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error code {3} occurred with description: {4}{1}{1}Runtime Version: {5}", Variable.Ambient.ScriptPath, Variable.Ambient.Newline, Variable.Local.sSubName, Variable.Ambient.ErrorNumber, Variable.Ambient.ErrorDescription, Variable.Ambient.GABVersion, Variable.Local.sError)
+
+	'Show error dialog
+	Function.Intrinsic.UI.MsgBox(Variable.Local.sError, "Error Occurred")
+Program.Sub.ShowError.End
+
+Program.Sub.LogError.Start
+'Todo
+Program.Sub.LogError.End
+
+
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' To be organized
+
+Program.Sub.ExportGridToFile.Start
+'@ Arg FormName	: String
+'@ Arg GridName	: String
+'@ Arg FilePath	: String
+
+	'FileExtension
+	v.local.FileExtension.Declare(String)
+	Function.Intrinsic.File.GetExtensionComponent(V.Args.FilePath, v.local.FileExtension)
+
+	Function.Intrinsic.Control.Try
+		Gui.[v.Args.FormName].[Variable.Args.GridName].Export(V.Args.FilePath,v.local.FileExtension)		
+				
+		Function.Intrinsic.Control.CallSub(CheckFileExists, "filePath", Variable.Args.filePath)
+		Function.Intrinsic.Control.If(Variable.Args.FileExists.Not)
+			Function.Intrinsic.UI.MsgBox(Variable.Args.FilePath, "Export Failed.")
+		Function.Intrinsic.Control.EndIf
+		
+	Function.Intrinsic.Control.Catch
+		Function.Intrinsic.Control.CallSub(ShowError)
+	Function.Intrinsic.Control.EndTry
+Program.Sub.ExportGridToFile.End
+
+Program.Sub.ApplySerializedTextToGrid.Start
+'@ Arg FormName	: String
+'@ Arg GridName	: String
+'@ Arg SerializedText	: String
+
+	Function.Intrinsic.Control.Try
+		Gui.[Variable.Args.FormName].[Variable.Args.GridName].Deserialize(Variable.Args.SerializedText)
+
+	Function.Intrinsic.Control.Catch
+		Function.Intrinsic.Control.CallSub(ShowError)
+	Function.Intrinsic.Control.EndTry
+Program.Sub.ApplySerializedTextToGrid.End
+
+Program.Sub.AddGssIconToForm.Start
+'@ Arg FormName	: String
+
+	'sIcon
+	v.Local.sIcon.Declare(String)
+	F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,v.Local.sIcon)
+
+	Gui.[Variable.Args.FormName]..Icon(V.Local.sIcon)
+Program.Sub.AddGssIconToForm.End
+
+Program.Sub.AddGssLogoToPictureBox.Start
+'@ Arg FormName	: String
+'@ Arg PictureBox	: String = Control name of the picture box to add the logo to.
+
+	'sGssLogo
+	v.Local.sGssLogo.Declare(String)
+	F.Intrinsic.String.Build("{0}\ART\GAB_GSS_Logo_Green_Dash.png",V.Caller.GlobalDir,V.Local.sGssLogo)
+	Gui.[Variable.Args.FormName].[Variable.Args.PictureBox].Picture(V.Local.sGssLogo)
+Program.Sub.AddGssLogoToPictureBox.End
