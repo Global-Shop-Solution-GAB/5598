@@ -1,0 +1,1028 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+	Program.External.Include.Library("DashboardFramework.lib")
+	Program.External.Include.Library("FrameworkCommons.lib")
+	v.Global.iCon.Declare(Long)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+
+	F.Intrinsic.Control.Try
+		f.Global.Object.CreateDB("GlobalDB",v.Caller.CompanyCode,v.Ambient.DBServerName,True,v.Global.iCon)
+		
+	F.Intrinsic.Control.Catch
+		Function.Intrinsic.Control.CallSub(ShowErrorAndEnd)
+	F.Intrinsic.Control.EndTry
+		
+	Function.Intrinsic.Control.CallSub(InitializeDashboard)
+	Function.Intrinsic.Control.CallSub(SetDefaultDate)
+	Function.Intrinsic.Control.CallSub(fillComboBoxes)
+	Function.Intrinsic.Control.CallSub(ShowDashboard)
+	
+Program.Sub.Main.End
+
+program.Sub.SetDefaultDate.Start
+	v.Local.dStartDate.Declare
+	
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+
+	Gui.[v.Args.MainFormName].dtpEndDt.Value(v.Ambient.Now)
+	f.Intrinsic.Date.DateAdd("M",-1,v.Ambient.Now,v.Local.dStartDate)
+	Gui.[v.Args.MainFormName].dtpStartDt.Value(v.Local.dStartDate)
+program.Sub.SetDefaultDate.End
+
+Program.Sub.fillComboBoxes.Start
+	'Fills the comboboxes used to filter data
+
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+
+	Gui.[v.Args.MainFormName].cboCustomers.addItems("dataTable","dtCust","Name_Customer","Name_Customer")
+	Gui.[v.Args.MainFormName].cboCustomers.text(" All Customers")
+
+	Gui.[v.Args.MainFormName].cboCustNo.AddItems("DataTable","dtCust","Customer","Customer")
+	Gui.[v.Args.MainFormName].cboCustNo.Text(" All Customers")
+	
+	Function.Intrinsic.Control.CallSub(openCompanyDB)
+	
+	F.Data.Dictionary.CreateFromSQL("dPart","CompanyDB","Select ' All Parts' As Part, ' All Parts' as Parts Union Select RTrim(Part) As Part,RTrim(Part) As Parts From Inventory_Mstr;",32)
+	Gui.[v.Args.MainFormName].cboParts.addItems("Dictionary","dPart")
+	Gui.[v.Args.MainFormName].cboParts.Text(" All Parts")
+	Function.Data.Dictionary.Close("dPart")
+	
+	F.Data.Dictionary.CreateFromSQL("dPL","CompanyDB","Select ' All Product Lines' As PL,' All Product Lines' As P Union Select RTrim(Product_Line) As Product_Line,RTrim(Product_Line) As Product_Lines From Product_Line Where Key_Data = 'ORDPRDLN' And Product_Line <> ''",32)
+	Gui.[v.Args.MainFormName].cboPL.AddItems("Dictionary","dPL")
+	Gui.[v.Args.MainFormName].cboPL.Text(" All Product Lines")
+	Function.Data.Dictionary.Close("dPL")
+	
+	Function.Intrinsic.Control.CallSub(closeCompanyDB)
+Program.Sub.fillComboBoxes.End
+
+Program.Sub.CloseDataConnections.Start
+'Todo: No implementation needed right now.
+Program.Sub.CloseDataConnections.End
+
+program.Sub.CloseExistingDatatables.Start
+	F.Intrinsic.Control.If(V.DataTable.dtData.Exists)
+		F.Data.DataTable.Close("dtData")
+		Function.Data.DataTable.DeleteRow("dtMain")
+		Function.Data.DataTable.AcceptChanges("dtMain")
+	f.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.If(V.DataTable.dtCrossRef.Exists)
+		F.Data.DataTable.Close("dtCrossRef")
+	f.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.If(V.DataTable.dtInvoiceCount.Exists)
+		F.Data.DataTable.Close("dtInvoiceCount")
+	f.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.If(V.DataTable.dtCost.Exists)
+		F.Data.DataTable.Close("dtCost")
+	f.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.If(V.DataTable.dtLines.Exists)
+		F.Data.DataTable.Close("dtLines")
+	f.Intrinsic.Control.EndIf							
+program.Sub.CloseExistingDatatables.End
+
+Program.Sub.dataTableFromObject.Start
+	v.Local.iRet.Declare
+	
+	'iCnt
+	v.Local.iCnt.Declare(Long, 0)
+	
+	'dStart
+	v.Local.dStart.declare("01/01/1900")
+	
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+	
+	'iMode
+	Function.Intrinsic.Control.CallSub(getObjMode)
+	
+	'filter, sCustomer0, sCustomer1
+	Function.Intrinsic.Control.CallSub(getFilters)
+	
+	f.Intrinsic.Control.CallSub(CloseExistingDatatables)
+		
+	'TODO: Request new mode to add fields branch code, shipvia and area code
+			
+	f.Intrinsic.Control.If(v.Caller.GSSVersion,=,2017.1)
+		F.Global.Object.LoadDataTable("dtInvoiceCount","oInvoiceCount","Sales.Invoicing.Invoices","GlobalDB",v.Global.iCon,519,True,"",v.Screen.[v.Args.mainFormName]!dtpStartDt.Value,v.Screen.[v.Args.mainFormName]!dtpEndDt.Value,v.Args.sCustomer0,v.Args.sCustomer1,v.local.iRet)
+		'F.Global.Object.LoadDataTable("dtInvoiceCount","oInvoiceCount","Sales.Invoicing.Invoices","GlobalDB",v.Global.iCon,470,True,"",v.Screen.[v.Args.mainFormName]!dtpStartDt.Value,v.Screen.[v.Args.mainFormName]!dtpEndDt.Value,v.Args.sCustomer0,v.Args.sCustomer1,v.local.iRet)
+		'F.Global.Object.LoadDataTable("dtCrossRef","oCrossRef","Sales.SalesOrderWorkOrderCrossReferences","GlobalDB",v.Global.iCon,3,True,"","","z",v.local.iRet)
+		F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!chkIncludeCost.Value,=,1)
+			F.Global.Object.LoadDataTable("dtCost","oCost","Sales.Invoicing.InvoiceLineCosts","GlobalDB",v.Global.iCon,7,True,"","","z",v.local.iRet)
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.Else
+		Function.Global.Object.LoadDataTable("dtInvoiceCount","oInvoiceCount","Sales.Invoicing.Invoices","GlobalDB",v.Global.iCon,519,True,,-1,v.Screen.[v.Args.mainFormName]!dtpStartDt.Value,v.Screen.[v.Args.mainFormName]!dtpEndDt.Value,v.Args.sCustomer0,v.Args.sCustomer1)
+		'Function.Global.Object.LoadDataTable("dtInvoiceCount","oInvoiceCount","Sales.Invoicing.Invoices","GlobalDB",v.Global.iCon,470,True,,-1,v.Screen.[v.Args.mainFormName]!dtpStartDt.Value,v.Screen.[v.Args.mainFormName]!dtpEndDt.Value,v.Args.sCustomer0,v.Args.sCustomer1)
+		'Function.Global.Object.LoadDataTable("dtCrossRef","oCrossRef","Sales.SalesOrderWorkOrderCrossReferences","GlobalDB",v.Global.iCon,3,True,,-1,"","z")		
+		F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!chkIncludeCost.Value,=,1)
+			Function.Global.Object.LoadDataTable("dtCost","oCost","Sales.Invoicing.InvoiceLineCosts","GlobalDB",v.Global.iCon,7,True,,-1,"","z")
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.EndIf
+	Function.Data.DataTable.Create("dtLines",True)
+	
+	Function.Intrinsic.Control.If(v.DataTable.dtInvoiceCount.RowCount,=,0)
+		Function.Intrinsic.UI.Msgbox("No invoice history for selected filters.","No Invoice History")
+		Function.Data.DataTable.Close("dtInvoiceCount")
+		Function.Intrinsic.Control.ExitSub
+	Function.Intrinsic.Control.EndIf
+		
+	Function.Intrinsic.Control.For(v.Local.iCnt,0,v.DataTable.dtInvoiceCount.RowCount--,1)	
+		f.Intrinsic.Control.If(v.Caller.GSSVersion,=,2017.1)
+			F.Global.Object.LoadDataTable("dtSingleLines","oSingleLines","Sales.Invoicing.InvoiceLines","GlobalDB",v.Global.iCon,v.Args.iMode,True,"",v.DataTable.dtInvoiceCount(v.Local.iCnt).invoiceNumber!FieldVal,v.DataTable.dtInvoiceCount(v.Local.iCnt).invoiceNumber!FieldVal,v.local.iRet)
+		f.Intrinsic.Control.Else			
+			Function.Global.Object.LoadDataTable("dtSingleLines","oSingleLines","Sales.Invoicing.InvoiceLines","GlobalDB",v.Global.iCon,v.Args.iMode,True,,-1,v.DataTable.dtInvoiceCount(v.Local.iCnt).invoiceNumber!FieldVal,v.DataTable.dtInvoiceCount(v.Local.iCnt).invoiceNumber!FieldVal)			
+		f.Intrinsic.Control.EndIf
+		
+		f.Intrinsic.Control.If(v.DataTable.dtSingleLines.RowCount,>,0)
+			Function.Data.DataTable.Merge("dtSingleLines","dtLines",True,1)
+		f.Intrinsic.Control.EndIf
+		
+		Function.Data.DataTable.Close("dtSingleLines")		
+	Function.Intrinsic.Control.Next(v.Local.iCnt)
+	
+	F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!chkIncludeCost.Value,=,1)
+		Function.Data.Linq.Join("leftJoin","dataTable","dtInvoiceCount*!*A","datatable","dtLines*!*B","A.INVOICENUMBER = B.INVOICENUMBER AND A.SALESORDERNUMBER = B.SALESORDERNUMBER AND A.SHIPMENTSEQUENCE = B.SHIPMENTSEQUENCE","dataTable","dtCost*!*C","B.INVOICENUMBER = C.INVOICENUMBER AND B.SALESORDERNUMBER = C.SALESORDERNUMBER AND B.SALESORDERLINENUMBER = C.SALESORDERLINENUMBER","A.SHIPMENT-DELIVERY-TRACKING-TRACKINGNUMBER*!*A.SHIPMENT-SALESORDERSHIPTO-CUSTOMER-SALES-SALESPERSON-SALESPERSONCODE*!*A.SHIPMENT-SALESORDER-BILLING-ADDRESS-NAME*!*A.SHIPMENT-SALESORDER-INFORMATION-CUSTOMERPURCHASEORDERNUMBER*!*A.SHIPMENT-SALESORDER-CUSTOMER-CUSTOMERNUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PART-PARTNUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PART-INFORMATION-PRODUCTLINE-PRODUCTLINECODE*!*B.SHIPMENTLINE-SALESORDERLINE-PART-DESCRIPTION-PRIMARY*!*B.INVOICE-SHIPMENT-SALESORDERSHIPTO-SHIPPING-ADDRESS-NAME*!*B.INVOICENUMBER*!*B.SALESORDERNUMBER*!*B.SALESORDERLINENUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MARGIN*!*B.ShipmentLine-SalesOrderLine-Tax-State*!*B.ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode*!*B.ShipmentLine-SalesOrderLine-Tax-ISTAXABLE*!*B.ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate*!*A.SHIPMENT-SALESORDERSHIPTO-ACCOUNTING-BRANCH-BRANCHCODE*!*B.ShipmentLine-SalesOrderLine-Information-Type*!*A.Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description*!*B.INFORMATION-INVOICEDATE*!*B.SHIPMENTLINE-SALESORDERLINE-PART-LOCATIONCODE*!*B.SHIPMENTLINE-QUANTITY-SHIPPED*!*B.SHIPMENTLINE-SALESORDERLINE-PART-COST-MONETARYVALUE-COMPANY-UNIT*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-DISCOUNTED*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED*!*A.shipment-salesordershipto-accounting-areacode*!*C.FREIGHT-MONETARYVALUE-COMPANY-UNIT*!*C.LABOR-MONETARYVALUE-COMPANY-UNIT*!*C.MATERIAL-MONETARYVALUE-COMPANY-UNIT*!*C.OTHER-MONETARYVALUE-COMPANY-UNIT*!*C.OUTSIDE-MONETARYVALUE-COMPANY-UNIT*!*C.OVERHEAD-MONETARYVALUE-COMPANY-UNIT*!*B.SHIPMENTLINE-SALESORDERLINE-WORKORDER-WORKORDERNUMBER AS WorkOrderNumber*!*B.SHIPMENTLINE-SALESORDERLINE-WORKORDER-WORKORDERSUFFIX AS WorkOrderSuffix",v.Args.filter,"","","dtData",true)
+	f.Intrinsic.Control.Else
+		Function.Data.Linq.Join("leftJoin","dataTable","dtInvoiceCount*!*A","datatable","dtLines*!*B","A.INVOICENUMBER = B.INVOICENUMBER AND A.SALESORDERNUMBER = B.SALESORDERNUMBER AND A.SHIPMENTSEQUENCE = B.SHIPMENTSEQUENCE","A.SHIPMENT-DELIVERY-TRACKING-TRACKINGNUMBER*!*A.SHIPMENT-SALESORDERSHIPTO-CUSTOMER-SALES-SALESPERSON-SALESPERSONCODE*!*A.SHIPMENT-SALESORDER-BILLING-ADDRESS-NAME*!*A.SHIPMENT-SALESORDER-INFORMATION-CUSTOMERPURCHASEORDERNUMBER*!*A.SHIPMENT-SALESORDER-CUSTOMER-CUSTOMERNUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PART-PARTNUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PART-INFORMATION-PRODUCTLINE-PRODUCTLINECODE*!*B.SHIPMENTLINE-SALESORDERLINE-PART-DESCRIPTION-PRIMARY*!*B.INVOICE-SHIPMENT-SALESORDERSHIPTO-SHIPPING-ADDRESS-NAME*!*B.INVOICENUMBER*!*B.SALESORDERNUMBER*!*B.SALESORDERLINENUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MARGIN*!*B.ShipmentLine-SalesOrderLine-Tax-State*!*B.ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode*!*B.ShipmentLine-SalesOrderLine-Tax-ISTAXABLE*!*B.ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate*!*A.SHIPMENT-SALESORDERSHIPTO-ACCOUNTING-BRANCH-BRANCHCODE*!*B.ShipmentLine-SalesOrderLine-Information-Type*!*A.Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description*!*B.INFORMATION-INVOICEDATE*!*B.SHIPMENTLINE-SALESORDERLINE-PART-LOCATIONCODE*!*B.SHIPMENTLINE-QUANTITY-SHIPPED*!*B.SHIPMENTLINE-SALESORDERLINE-PART-COST-MONETARYVALUE-COMPANY-UNIT*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-DISCOUNTED*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED*!*A.shipment-salesordershipto-accounting-areacode*!*B.SHIPMENTLINE-SALESORDERLINE-WORKORDER-WORKORDERNUMBER AS WorkOrderNumber*!*B.SHIPMENTLINE-SALESORDERLINE-WORKORDER-WORKORDERSUFFIX AS WorkOrderSuffix",v.Args.filter,"","","dtData",true)
+	F.Intrinsic.Control.EndIf
+	
+	
+	'Function.Data.Linq.Join("leftJoin","dataTable","dtInvoiceCount*!*A","datatable","dtLines*!*B","A.INVOICENUMBER = B.INVOICENUMBER AND A.SALESORDERNUMBER = B.SALESORDERNUMBER AND A.SHIPMENTSEQUENCE = B.SHIPMENTSEQUENCE","A.SHIPMENT-DELIVERY-TRACKING-TRACKINGNUMBER*!*A.SHIPMENT-SALESORDERSHIPTO-CUSTOMER-SALES-SALESPERSON-SALESPERSONCODE*!*A.SHIPMENT-SALESORDER-BILLING-ADDRESS-NAME*!*A.SHIPMENT-SALESORDER-INFORMATION-CUSTOMERPURCHASEORDERNUMBER*!*A.SHIPMENT-SALESORDER-CUSTOMER-CUSTOMERNUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PART-PARTNUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PART-INFORMATION-PRODUCTLINE-PRODUCTLINECODE*!*B.SHIPMENTLINE-SALESORDERLINE-PART-DESCRIPTION-PRIMARY*!*B.INVOICE-SHIPMENT-SALESORDERSHIPTO-SHIPPING-ADDRESS-NAME*!*B.INVOICENUMBER*!*B.SALESORDERNUMBER*!*B.SALESORDERLINENUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MARGIN*!*B.ShipmentLine-SalesOrderLine-Tax-State*!*B.ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode*!*B.ShipmentLine-SalesOrderLine-Tax-ISTAXABLE*!*B.ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate*!*B.SHIPMENT-SALESORDERSHIPTO-ACCOUNTING-BRANCH-BRANCHCODE*!*B.ShipmentLine-SalesOrderLine-Information-Type*!*B.Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description*!*B.INFORMATION-INVOICEDATE*!*B.SHIPMENTLINE-SALESORDERLINE-PART-LOCATIONCODE*!*B.SHIPMENTLINE-QUANTITY-SHIPPED*!*B.SHIPMENTLINE-SALESORDERLINE-PART-COST-MONETARYVALUE-COMPANY-UNIT*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-DISCOUNTED*!*B.SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED*!*B.shipment-salesordershipto-accounting-areacode*!*B.SHIPMENTLINE-SALESORDERLINE-WORKORDER-WORKORDERNUMBER*!*B.SHIPMENTLINE-SALESORDERLINE-WORKORDER-WORKORDERSUFFIX",v.Args.filter,"","","dtData",true)
+			
+	Function.Data.DataTable.Merge("dtData","dtMain",True,1)
+
+	f.Intrinsic.Control.CallSub(fillFromDictionary)
+Program.Sub.dataTableFromObject.End
+
+Program.Sub.getObjMode.Start
+'@ Return iMode	: Long
+
+	v.Local.iMode.Declare(Long)
+
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+
+	F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!chkFreight.Value,=,1)
+	F.Intrinsic.Control.AndIf(V.Screen.[v.args.MainFormName]!chkProgress.Value,=,1)
+		'v.Local.iMode.Set(610) 'Invoice Lines Mode 538
+		v.Local.iMode.Set(654) 'Invoice Lines Mode 538
+	
+	F.Intrinsic.Control.ElseIf(V.Screen.[v.args.MainFormName]!chkFreight.Value,=,1)
+		'V.Local.iMode.Set(612) 'Invoice Lines Mode 540
+		V.Local.iMode.Set(653) 'Invoice Lines Mode 540
+	
+	F.Intrinsic.Control.ElseIf(V.Screen.[v.args.MainFormName]!chkProgress.Value,=,1)
+		'V.Local.iMode.Set(611) 'Invoice Lines Mode 539
+		V.Local.iMode.Set(652) 'Invoice Lines Mode 539
+	
+	F.Intrinsic.Control.Else
+		'V.Local.iMode.Set(613) 'Invoice LinesMode 541
+		V.Local.iMode.Set(651) 'Invoice LinesMode 541
+	F.Intrinsic.Control.EndIf
+	
+	'Return
+	Function.Intrinsic.Variable.AddRV("iMode",v.Local.iMode)
+Program.Sub.getObjMode.End
+
+Program.Sub.getFilters.Start
+'@ Return filter	: String
+'@ Return (conditional) sCustomer0	: String
+'@ Return (conditional) sCustomer1	: String
+
+	v.Local.sCustomer.Declare(String, "")
+	v.Local.sFilter.Declare(String, "")
+	v.local.iFilterCnt.Declare(Long, 0)
+
+	'Specific Customer
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+	F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!chkCustNo.Value,=,0)
+		F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!cboCustomers.Value,<>," All Customers")
+			F.Data.Dictionary.CreateFromDataTable("dCust","dtCust","CUSTOMER","NAME_CUSTOMER")
+			F.Data.Dictionary.ReturnKeyFromValue("dCust",V.Screen.[v.args.MainFormName]!cboCustomers.Value.RTrim,FALSE,v.Local.sCustomer)
+			Function.Data.Dictionary.Close("dCust")
+
+			Function.Intrinsic.Variable.AddRV("sCustomer0",v.Local.sCustomer)
+			Function.Intrinsic.Variable.AddRV("sCustomer1",v.Local.sCustomer)
+		
+		Function.Intrinsic.Control.Else
+			Function.Intrinsic.Variable.AddRV("sCustomer0","")
+			'Function.Intrinsic.Variable.AddRV("sCustomer1","z")
+			Function.Intrinsic.Variable.AddRV("sCustomer1","~~~~~~")
+		F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!cboCustNo.Value,<>," All Customers")			
+			Function.Intrinsic.Variable.AddRV("sCustomer0",V.Screen.[v.args.MainFormName]!cboCustNo.Value.RTRIM)
+			Function.Intrinsic.Variable.AddRV("sCustomer1",V.Screen.[v.args.MainFormName]!cboCustNo.Value.RTRIM)
+
+		Function.Intrinsic.Control.else
+			Function.Intrinsic.Variable.AddRV("sCustomer0","")
+			'Function.Intrinsic.Variable.AddRV("sCustomer1","z")
+			Function.Intrinsic.Variable.AddRV("sCustomer1","~~~~~~")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+
+	'Specific Part
+	F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!cboParts.Value,<>," All Parts")		
+		F.Intrinsic.String.Build("{0} B.SHIPMENTLINE-SALESORDERLINE-PART-PARTNUMBER='{1}'",V.Local.sFilter,V.Screen.[v.args.MainFormName]!cboParts.Value,V.Local.sFilter)
+		Function.Intrinsic.Math.Add(v.Local.iFilterCnt,1,v.Local.iFilterCnt)
+	F.Intrinsic.Control.EndIf
+
+	'Specific PLs
+	F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!cboPL.Value,<>," All Product Lines")
+		Function.Intrinsic.Control.If(v.Local.iFilterCnt,>,0)
+			Function.Intrinsic.String.Build("{0} AND ",v.Local.sFilter,v.Local.sFilter)
+		Function.Intrinsic.Control.EndIf
+		
+		Function.Intrinsic.String.Build("{0} B.SHIPMENTLINE-SALESORDERLINE-PART-INFORMATION-PRODUCTLINE-PRODUCTLINECODE ='{1}'",v.Local.sFilter,V.Screen.[v.args.MainFormName]!cboPL.Value.UCase,v.Local.sFilter)
+	F.Intrinsic.Control.EndIf
+	
+	'Return
+	Function.Intrinsic.Variable.AddRV("filter",v.Local.sFilter)
+Program.Sub.getFilters.End
+
+Program.Sub.fillFromDictionary.Start
+'	Function.Intrinsic.Control.CallSub(openCompanyDB)
+
+'	F.Data.Dictionary.CreateFromSQL("dWOStatus","CompanyDB","Select If(RTrim(Suffix) = '',Job,Job+'-'+Suffix) As WO,'Active' As Status From V_Job_Header Union Select If(RTrim(Suffix) = '',Job,Job+'-'+Suffix) As WO,'History' As Status From V_Job_Hist_Mast Order By Status,WO;",32)
+'	Function.Data.DataTable.FillFromDictionary("dtMain","dWOStatus","WO","WOStatus")
+'	Function.Data.Dictionary.Close("dWOStatus")
+
+'	Function.Intrinsic.Control.CallSub(closeCompanyDB)
+
+Program.Sub.fillFromDictionary.End
+
+Program.Sub.nonStandardControls.Start
+'adding controls not included on default standard dashboard
+
+		f.Intrinsic.Control.CallSub(GetMainFormName)
+		Function.Intrinsic.Control.CallSub(GetMainGridName)
+
+		Gui.[v.Args.MainFormName].frameDates.Create(Frame)
+		Gui.[v.Args.MainFormName].frameDates.Size(1590,1470)
+		Gui.[v.Args.MainFormName].frameDates.Position(15,-30)
+		Gui.[v.Args.MainFormName].frameDates.Caption("Date Range")
+		Gui.[v.Args.MainFormName].frameDates.Anchor(5)
+		Gui.[v.Args.MainFormName].dtpStartDt.Create(DatePicker)
+		Gui.[v.Args.MainFormName].dtpStartDt.Size(1470,285)
+		Gui.[v.Args.MainFormName].dtpStartDt.Position(75,495)
+		Gui.[v.Args.MainFormName].dtpStartDt.Parent("frameDates")
+		Gui.[v.Args.MainFormName].lblStartDt.Create(Label,"Start",True,600,255,0,75,300,True,0,"Arial",8,-2147483633,0)
+		Gui.[v.Args.MainFormName].lblStartDt.Parent("frameDates")
+		Gui.[v.Args.MainFormName].lblEndDt.Create(Label,"End",True,435,255,0,75,855,True,0,"Arial",8,-2147483633,0)
+		Gui.[v.Args.MainFormName].lblEndDt.Parent("frameDates")
+		Gui.[v.Args.MainFormName].dtpEndDt.Create(DatePicker)
+		Gui.[v.Args.MainFormName].dtpEndDt.Size(1470,285)
+		Gui.[v.Args.MainFormName].dtpEndDt.Position(75,1065)
+		Gui.[v.Args.MainFormName].dtpEndDt.Parent("frameDates")
+		
+		Gui.[v.Args.MainFormName].frameOptions.Create(Frame)
+		Gui.[v.Args.MainFormName].frameOptions.Size(3800,1655)
+		Gui.[v.Args.MainFormName].frameOptions.Position(1620, -30)
+		Gui.[v.Args.MainFormName].frameOptions.Caption("Options")
+		Gui.[v.Args.MainFormName].cboCustomers.Create(ComboBox)
+		Gui.[v.Args.MainFormName].cboCustomers.Size(2340,330)
+		Gui.[v.Args.MainFormName].cboCustomers.Position(60,240)
+		Gui.[v.Args.MainFormName].cboCustomers.Parent("frameOptions")
+		Gui.[v.Args.MainFormName].cboParts.Create(ComboBox)
+		Gui.[v.Args.MainFormName].cboParts.Size(2340,330)
+		Gui.[v.Args.MainFormName].cboParts.Position(60,615)
+		Gui.[v.Args.MainFormName].cboParts.Parent("frameOptions")
+		Gui.[v.Args.MainFormName].cboPL.Create(ComboBox)
+		Gui.[v.Args.MainFormName].cboPL.Size(2340,330)
+		Gui.[v.Args.MainFormName].cboPL.Position(60,1005)
+		Gui.[v.Args.MainFormName].cboPL.Parent("frameOptions")
+		Gui.[v.Args.MainFormName].chkFreight.Create(CheckBox)
+		Gui.[v.Args.MainFormName].chkFreight.Size(1200,255)
+		Gui.[v.Args.MainFormName].chkFreight.Position(2445,465)
+		Gui.[v.Args.MainFormName].chkFreight.Parent("frameOptions")
+		Gui.[v.Args.MainFormName].chkFreight.Caption("Incl Freight")
+		Gui.[v.Args.MainFormName].chkProgress.Create(CheckBox)
+		Gui.[v.Args.MainFormName].chkProgress.Size(1290,225)
+		Gui.[v.Args.MainFormName].chkProgress.Position(2445,735)
+		Gui.[v.Args.MainFormName].chkProgress.Parent("frameOptions")
+		Gui.[v.Args.MainFormName].chkProgress.Caption("Incl Prog Bill")
+		Gui.[v.Args.MainFormName].cmdRefresh.Create(Button)
+		Gui.[v.Args.MainFormName].cmdRefresh.Size(975,375)
+		Gui.[v.Args.MainFormName].cmdRefresh.Position(2445,1230)
+		Gui.[v.Args.MainFormName].cmdRefresh.Caption("REFRESH")
+		Gui.[v.Args.MainFormName].cmdRefresh.Event(Click,refreshDash)
+		Gui.[v.Args.MainFormName].cmdRefresh.Parent("frameOptions")
+		
+		Gui.[v.Args.MainFormName].chkIncludeCost.Create(CheckBox)
+		Gui.[v.Args.MainFormName].chkIncludeCost.Size(1200,255)
+		Gui.[v.Args.MainFormName].chkIncludeCost.Position(2445,995)
+		Gui.[v.Args.MainFormName].chkIncludeCost.Parent("frameOptions")
+		Gui.[v.Args.MainFormName].chkIncludeCost.Caption("Incl Cost")
+		
+		Gui.[v.Args.MainFormName].cboCustNo.Create(ComboBox)
+		Gui.[v.Args.MainFormName].cboCustNo.Visible(False)
+		Gui.[v.Args.MainFormName].cboCustNo.Size(2340,330)
+		Gui.[v.Args.MainFormName].cboCustNo.Position(60,240)
+		Gui.[v.Args.MainFormName].cboCustNo.Parent("frameOptions")
+		Gui.[v.Args.MainFormName].cboCustNo.Enabled(False)
+		Gui.[v.Args.MainFormName].chkCustNo.Create(CheckBox)
+		Gui.[v.Args.MainFormName].chkCustNo.Size(1200,255)
+		Gui.[v.Args.MainFormName].chkCustNo.Position(2445,195)
+		Gui.[v.Args.MainFormName].chkCustNo.Parent("frameOptions")
+		Gui.[v.Args.MainFormName].chkCustNo.Caption("Cust No")
+		Gui.[v.Args.MainFormName].chkCustNo.Event(Click,chkCustNo_Click)
+		
+		Gui.frmProfit..Create
+		Gui.frmProfit..Caption("Profit Pie Chart")
+		Gui.frmProfit..Size(11400,8370)
+		Gui.frmProfit..MinX(0)
+		Gui.frmProfit..MinY(0)
+		Gui.frmProfit..Position(0,0)
+		Gui.frmProfit..BackColor(-2147483633)	
+		Gui.frmProfit..MousePointer(0)
+		Gui.frmProfit..Event(UnLoad,frmProfit_UnLoad)
+		Gui.frmProfit.GsChartProfit.Create(GsChart)
+		Gui.frmProfit.GsChartProfit.Size(11325,8070)
+		Gui.frmProfit.GsChartProfit.Position(0,0)
+		
+Program.Sub.nonStandardControls.End
+
+Program.Sub.initializeDictionaries.Start
+''Todo: If an error occurs, some or all of these dictionaries will not exist.
+''      Is the rest of the program ok with this?
+''      ahhhh.... I'll think of a solution
+
+	Function.Intrinsic.Control.CallSub(openCompanyDB)
+	
+	F.Data.DataTable.CreateFromSQL("dtCust","CompanyDB","Select ' All Customers' As Customer,' All Customers' As Name_Customer Union Select Customer,RTrim(Name_Customer) As Name_Customer From Customer_Master Where Rec = '1';",True)
+
+	F.Data.Dictionary.CreateFromSQL("dPart","CompanyDB","Select ' All Parts' As Part, ' All Parts' as Parts Union Select RTrim(Part) As Part,RTrim(Part) As Parts From Inventory_Mstr;",32)
+	F.Data.Dictionary.CreateFromSQL("dPL","CompanyDB","Select ' All Product Lines' As PL,' All Product Lines' As P Union Select RTrim(Product_Line) As Product_Line,RTrim(Product_Line) As Product_Lines From Product_Line Where Key_Data = 'ORDPRDLN' And Product_Line <> ''",32)
+	F.Data.Dictionary.CreateFromSQL("dTaxDesc","CompanyDB","Select Zone+Auth as dude,Descr from V_AR_Tax_Tables;",32)
+	F.Data.Dictionary.CreateFromSQL("dmatl","CompanyDB","Select Invoice+Order_No+Seq+Line As SalesKey, matl from V_OE_Sys_Cost_Elem;",32)
+	F.Data.Dictionary.CreateFromSQL("dLabor","CompanyDB","Select Invoice+Order_No+Seq+Line As SalesKey, Labor from V_OE_Sys_Cost_Elem;",32)
+	F.Data.Dictionary.CreateFromSQL("dOvhd","CompanyDB","Select Invoice+Order_No+Seq+Line As SalesKey, Ovhd from V_OE_Sys_Cost_Elem;",32)
+	F.Data.Dictionary.CreateFromSQL("dOuts","CompanyDB","Select Invoice+Order_No+Seq+Line As SalesKey, Outs from V_OE_Sys_Cost_Elem;",32)
+	F.Data.Dictionary.CreateFromSQL("dFrgt","CompanyDB","Select Invoice+Order_No+Seq+Line As SalesKey, Frgt from V_OE_Sys_Cost_Elem;",32)
+	F.Data.Dictionary.CreateFromSQL("dOth","CompanyDB","Select Invoice+Order_No+Seq+Line As SalesKey, Oth from V_OE_Sys_Cost_Elem;",32)
+	F.Data.Dictionary.CreateFromSQL("dTrackNo","CompanyDB","Select Order_No,RTrim(Tracking_No) as track From Order_Hist_Head Order By 1;",32)
+	F.Data.Dictionary.CreateFromSQL("dWO","CompanyDB","Select Order_No+Order_Line As OrderKey,If(RTrim(Suffix) = '',Job,Job+'-'+Suffix) As WO From V_Order_To_WO Order By OrderKey;",32)
+	F.Data.Dictionary.CreateFromSQL("dWOStatus","CompanyDB","Select If(RTrim(Suffix) = '',Job,Job+'-'+Suffix) As WO,'Active' As Status From V_Job_Header Union Select If(RTrim(Suffix) = '',Job,Job+'-'+Suffix) As WO,'History' As Status From V_Job_Hist_Mast Order By Status,WO;",32)
+
+	Function.Intrinsic.Control.CallSub(closeCompanyDB)
+
+Program.Sub.initializeDictionaries.End
+
+Program.Sub.addColumns.Start
+	'adds any columns needed not already existent in the dataTable
+
+	Function.Data.DataTable.AddExpressionColumn("dtMain","Total_Cost",Float,"[ShipmentLine-Quantity-Shipped]*[ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit]")
+	Function.Data.DataTable.AddExpressionColumn("dtMain","Profit",Float,"[SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED]-[Total_Cost]")
+	Function.Data.DataTable.AddExpressionColumn("dtMain","WO",String,"IIF([WorkOrderSuffix]='',[WorkOrderNumber],[WorkOrderNumber]+'-'+[WorkOrderSuffix])")
+	Function.Data.DataTable.AddExpressionColumn("dtMain","Margin",Float,"[ShipmentLine-SalesOrderLine-Pricing-Margin]/100")
+	Function.Data.DataTable.AddColumn("dtMain","WOStatus",String)
+		
+Program.Sub.addColumns.End
+
+Program.Sub.refreshDash.Start	
+	v.Local.iDateDiff.Declare
+	'refreshes entire dashboard and upon first click loads the dashboard for the first time
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+			
+	Function.Intrinsic.Control.If(v.Screen.[v.Args.mainFormName]!dtpStartDt.Value,>,v.Screen.[v.Args.mainFormName]!dtpEndDt.Value)
+		Function.Intrinsic.UI.Msgbox("Dates Incompatible: Start date must be before end date.")
+		Function.Intrinsic.Control.ExitSub
+	f.Intrinsic.Control.Else
+		f.Intrinsic.Date.DateDiff("M",v.Screen.[v.Args.mainFormName]!dtpStartDt.Value,v.Screen.[v.Args.mainFormName]!dtpEndDt.Value,v.Local.iDateDiff)
+		f.Intrinsic.Control.If(v.Local.iDateDiff,>,6)
+		f.Intrinsic.Control.AndIf(V.Screen.[v.Args.mainFormName]!chkCustNo.Value,=,0)
+			Function.Intrinsic.UI.Msgbox("Dates range cannot be greater than 6 months when all customers is selected.")			
+			Function.Intrinsic.Control.ExitSub
+		f.Intrinsic.Control.ElseIf(v.Local.iDateDiff,>,12)
+			Function.Intrinsic.UI.Msgbox("Dates range cannot be greater than 12 months.")
+		f.Intrinsic.Control.EndIf
+	Function.Intrinsic.Control.EndIf
+	gui.[v.Args.MainFormName].cmdRefresh.enabled(false)
+	
+	f.Intrinsic.Control.CallSub(DataTableFromObject)
+	gui.[v.Args.MainFormName].cmdRefresh.enabled(True)
+Program.Sub.refreshDash.End
+
+Program.Sub.chkCustNo_Click.Start
+'Customer chkCustNo click event handler
+	f.Intrinsic.Control.CallSub(getMainFormName)
+
+	F.Intrinsic.Control.If(V.Screen.[v.Args.mainFormName]!chkCustNo.Value,=,0)
+		Gui.[v.args.mainFormName].cboCustNo.Enabled(False)
+		Gui.[v.args.mainFormName].cboCustNo.Visible(False)
+		Gui.[v.args.mainFormName].cboCustomers.Visible(True)
+		Gui.[v.args.mainFormName].cboCustomers.Enabled(True)
+	
+	F.Intrinsic.Control.Else
+		Gui.[v.args.mainFormName].cboCustNo.Enabled(True)
+		Gui.[v.args.mainFormName].cboCustNo.Visible(True)
+		Gui.[v.args.mainFormName].cboCustomers.Visible(False)
+		Gui.[v.args.mainFormName].cboCustomers.Enabled(False)
+	F.Intrinsic.Control.EndIf
+Program.Sub.chkCustNo_Click.End
+
+Program.Sub.buildDataViews.Start
+	f.Data.DataView.Create("dtMain","dvMain")
+Program.Sub.buildDataViews.End
+
+Program.Sub.buildFilter.Start
+'Builds the Filter based on user input in to be passed back to buildDataView
+	v.Local.sFilter.Declare
+
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+	F.Intrinsic.Control.If(V.Screen.[v.Args.MainFormName]!chkCustNo.Value,=,0)
+
+		F.Intrinsic.Control.If(V.Screen.[v.Args.MainFormName]!chkCustNo.Value,=,0)
+
+			F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!cboCustomers.Value,<>," All Customers")
+				'f.Intrinsic.Control.CallSub(getCustomerValue,"formName",v.Args.formname)
+				F.Intrinsic.String.Build("{0} And 'INVOICE-SHIPMENT-SALESORDERSHIPTO-SHIPING-ADDRESS-NAME' = '{1}'",V.Local.sFilter,V.ARGS.sCustomer.Trim,V.Local.sFilter)
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.Else
+			F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!cboCustNo.Value,<>," All Customers")
+			'	f.Intrinsic.Control.CallSub(getCustNo,"formName",v.Args.formname)
+			'	F.Intrinsic.String.Build("{0} And Customer = '{1}'",V.Local.sFilter,V.args.sCustNo.Trim,V.Local.sFilter)   THIS LINE WILL BREAK CODE, WAITING FOR NEW MODE OPERATION
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+		
+		'Specific Part
+		F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!cboParts.Value,<>," All Parts")
+			Function.Intrinsic.Control.CallSub(getPartValue,"formName",v.Args.formname)
+			F.Intrinsic.String.Build("{0} And 'SHIPMENTLINE-SALESORDERLINE-PART-PARTNUMBER' = '{1}'",V.Local.sFilter,V.Args.sPart.Trim,V.Local.sFilter)
+		F.Intrinsic.Control.EndIf
+		
+		'Specific PLs
+		F.Intrinsic.Control.If(V.Screen.[v.args.MainFormName]!cboPL.Value,<>," All Product Lines")
+			F.Intrinsic.Control.CallSub(getPLValue,"formName",v.Args.formname)
+			F.Intrinsic.String.Build("{0} And 'SHIPMENTLINE-SALESORDERLINE-PART-INFORMATION-PRODUCTLINE-PRODUCTLINECODE' = '{1}'",V.Local.sFilter,V.Args.sPL.Trim,V.Local.sFilter)
+		F.Intrinsic.Control.EndIf
+		'Filter out by Date
+		F.Intrinsic.String.Build("{0} And 'INFORMATION-INVOICEDATE' >= '{1}' And 'INFORMATION-INVOICEDATE' <= '{2}'",V.Local.sFilter,V.Screen.[v.args.MainFormName]!dtpStartDt.Value,V.Screen.[v.args.MainFormName]!dtpEndDt.Value,V.Local.sFilter)
+		
+		f.Intrinsic.Variable.addRV("sFilter",v.Local.sFilter)
+		
+	Function.Intrinsic.Control.EndIf
+Program.Sub.buildFilter.End
+
+Program.Sub.getCustomerValue.Start
+'@ Return sCustomer	: String
+
+	Function.Intrinsic.Control.CallSub(GetScreenValue, "ControlName", "cboCustomer")
+
+	'Return
+	f.Intrinsic.Variable.AddRV("sCustomer", Variable.Args.ScreenValue)
+Program.Sub.getCustomerValue.End
+
+Program.Sub.getPartValue.Start
+'@ Return sPart	: String
+
+	Function.Intrinsic.Control.CallSub(GetScreenValue, "ControlName", "cboParts")
+
+	'Return
+	f.Intrinsic.Variable.AddRV("sPart", Variable.Args.ScreenValue)
+Program.Sub.getPartValue.End
+
+Program.Sub.getPLValue.Start
+'@ Return sPL	: String
+
+	Function.Intrinsic.Control.CallSub(GetScreenValue, "ControlName", "cboPL")
+
+	'Return
+	f.Intrinsic.Variable.AddRV("sPL", Variable.Args.ScreenValue)
+Program.Sub.getPLValue.End
+
+Program.Sub.GetScreenValue.Start
+'@ Arg ControlName	: String
+'@ Return ScreenValue	: String
+	
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ScreenValue", Variable.Screen.[Variable.Args.MainFormName]![Variable.Args.ControlName].Value)
+Program.Sub.GetScreenValue.End
+
+Program.Sub.getCustNoValue.Start
+'@ Return sCustNo	: String
+
+	Function.Intrinsic.Control.CallSub(GetScreenValue, "ControlName", "cboCustNo")
+
+	'Return
+	f.Intrinsic.Variable.AddRV("sCustNo", Variable.Args.ScreenValue)
+Program.Sub.getCustNoValue.End
+
+Program.Sub.buildDataTables.Start
+	v.Local.dStart.Declare
+
+	v.Local.dStart.Set(01/01/1900)
+
+	Function.Intrinsic.Control.CallSub(nonStandardControls)
+
+	Function.Intrinsic.Control.If(v.DataTable.dtMain.Exists)
+		Function.Data.DataTable.Close("dtMain")
+	Function.Intrinsic.Control.EndIf
+	
+	F.Data.DataTable.CreateFromString("dtMain","","ShipmentLine-SalesOrderLine-Part-PartNumber*!*ShipmentLine-SalesOrderLine-Part-LocationCode*!*ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode*!*ShipmentLine-SalesOrderLine-Part-Description-Primary*!*Shipment-SalesOrder-Customer-CustomerNumber*!*Shipment-SalesOrder-Billing-Address-Name*!*Invoice-Shipment-SalesOrderShipTo-Shipping-Address-Name*!*Shipment-SalesOrderShipTo-Accounting-AreaCode*!*InvoiceNumber*!*SalesOrderNumber*!*SalesOrderLineNumber*!*Information-InvoiceDate*!*ShipmentLine-Quantity-Shipped*!*ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit*!*ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted*!*SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED*!*ShipmentLine-SalesOrderLine-Pricing-Margin*!*ShipmentLine-SalesOrderLine-Tax-State*!*ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode*!*ShipmentLine-SalesOrderLine-Tax-ISTAXABLE*!*ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate*!*Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode*!*Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode*!*ShipmentLine-SalesOrderLine-Information-Type*!*Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description*!*Material-MonetaryValue-Company-Unit*!*Labor-MonetaryValue-Company-Unit*!*Overhead-MonetaryValue-Company-Unit*!*Outside-MonetaryValue-Company-Unit*!*Freight-MonetaryValue-Company-Unit*!*Other-MonetaryValue-Company-Unit*!*Shipment-SalesOrder-Information-CustomerPurchaseOrderNumber*!*Shipment-Delivery-Tracking-TrackingNumber*!*WorkOrderNumber*!*WorkOrderSuffix","String*!*String*!*String*!*String*!*String*!*String*!*String*!*String*!*String*!*Integer*!*Integer*!*dateTime*!*float*!*float*!*float*!*Float*!*float*!*String*!*String*!*Boolean*!*float*!*String*!*String*!*Integer*!*String*!*float*!*float*!*float*!*float*!*float*!*float*!*String*!*string*!*string*!*string","..",".",True)
+	F.Data.DataTable.DeleteRow("dtMain",0)
+	
+	Function.Intrinsic.Control.CallSub(OpenCompanyDB)
+	F.Data.DataTable.CreateFromSQL("dtCust","CompanyDB","Select ' All Customers' As Customer,' All Customers' As Name_Customer Union Select RTRIM(Customer),RTrim(Name_Customer) As Name_Customer From Customer_Master Where Rec = '1';",True)
+
+	Function.Intrinsic.Control.CallSub(closeCompanyDB)
+	Function.Intrinsic.Control.CallSub("addColumns")
+Program.Sub.buildDataTables.End
+
+Program.Sub.buildGridViews.Start
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+	
+	'MainGridName
+	Function.Intrinsic.Control.CallSub(GetMainGridName)
+
+	Gui.[v.args.mainFormName].[v.args.mainGridName].AddGridviewFromDataview("gvMain","dtMain","dvMain")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridName].SetGridViewProperty("gvMain","EnableAppearanceOddRow",True)
+
+	Function.Intrinsic.Control.CallSub(boldHeaders)
+
+	Function.Intrinsic.Control.CallSub(setColumnTitleFormat)
+	Function.Intrinsic.Control.CallSub(setColumnCellFormat)
+	Function.Intrinsic.Control.CallSub(setColumnAllowEdit)
+
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-State","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-ISTAXABLE","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Information-Type","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","WorkORderSuffix","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","WorkOrderNumber","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","WO","Visible",False)	
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","WOStatus","Visible",False)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-Margin","Visible",False)
+
+	Gui.[v.Args.mainFormName].[v.args.mainGridName].mainView("gvMain")
+
+Program.Sub.buildGridViews.End
+
+Program.Sub.boldHeaders.Start
+	'MainFormName
+	Function.Automation.Generic.CallSub(getMainFormName)
+
+	'MainGridName
+	Function.Automation.Generic.CallSub(getMainGridName)
+
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Description-Primary","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Customer-CustomerNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Invoice-Shipment-SalesOrderShipTo-Shipping-Address-Name","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-AreaCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","InvoiceNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderLineNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Information-InvoiceDate","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-Quantity-Shipped","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Margin","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-State","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-ISTAXABLE","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Information-Type","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Material-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Other-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Information-CustomerPurchaseOrderNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-Delivery-Tracking-TrackingNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Profit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Total_Cost","HeaderFontBold",True)
+	
+Program.Sub.boldHeaders.End
+
+Program.Sub.setColumnTitleFormat.Start
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+
+	'MainGridName
+	Function.Intrinsic.Control.CallSub(getMainGridName)
+
+	'Captions
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber","Caption","Part Number")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","Caption","Loc")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","Caption","PL")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Description-Primary","Caption","Description")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-SALESORDER-CUSTOMER-CUSTOMERNUMBER","Caption","Customer No")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Billing-Address-Name","Caption","Customer Name")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Invoice-Shipment-SalesOrderShipTo-Shipping-Address-Name","Caption","Ship To")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-AreaCode","Caption","Area")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","InvoiceNumber","Caption","Invoice")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderNumber","Caption","Order No")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderLineNumber","Caption","Order Ln")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-SALESORDER-INFORMATION-CUSTOMERPURCHASEORDERNUMBER","Caption","Customer PO")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Information-InvoiceDate","Caption","Invoice Date")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-Quantity-Shipped","Caption","Qty Shipped")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","Caption","Cost")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Total_Cost","Caption","Total Cost")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","Caption","Price")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","Caption","Sales")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Margin","Caption","Margin")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-State","Caption","Zone")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode","Caption","Code")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-ISTAXABLE","Caption","Taxable")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate","Caption","Tax Rate")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","Caption","SP")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode","Caption","Branch")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Information-Type","Caption","Line Type")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description","Caption","Ship Via")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-DELIVERY-TRACKING-TRACKINGNUMBER","Caption","Tracking No")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Material-MonetaryValue-Company-Unit","Caption","Material")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","Caption","Labor")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","Caption","Overhead")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","Caption","Outside")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","Caption","Freight")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Other-MonetaryValue-Company-Unit","Caption","Other")
+
+	'HeaderHAlignments
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Description-Primary","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Customer-CustomerNumber","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Billing-Address-Name","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","InvoiceNumber","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderNumber","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderLineNumber","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Information-InvoiceDate","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-Quantity-Shipped","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Margin","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-State","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-ISTAXABLE","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Information-Type","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Material-MonetaryValue-Company-Unit","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Other-MonetaryValue-Company-Unit","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Information-CustomerPurchaseOrderNumber","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-Delivery-Tracking-TrackingNumber","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Profit","HeaderHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Total_Cost","HeaderHAlignment","Center")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridName].SetColumnProperty("gvMain","Invoice-Shipment-SalesOrderShipTo-Shipping-Address-Name","HeaderHAlignment","Center")
+
+	'HeaderFontBolds
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Description-Primary","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Customer-CustomerNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Billing-Address-Name","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-AreaCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","InvoiceNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderLineNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Information-InvoiceDate","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-Quantity-Shipped","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Margin","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-State","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-ISTAXABLE","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Information-Type","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Material-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Other-MonetaryValue-Company-Unit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Information-CustomerPurchaseOrderNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-Delivery-Tracking-TrackingNumber","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Profit","HeaderFontBold",True)
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Total_Cost","HeaderFontBold",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridName].setColumnProperty("gvMain","Invoice-Shipment-SalesOrderShipTo-Shipping-Address-Name","HeaderFontBold",True)
+
+Program.Sub.setColumnTitleFormat.End
+
+Program.Sub.setColumnCellFormat.Start
+
+	Gui.[v.Args.mainFormName].[v.Args.maingridName].SetGridviewProperty("gvmain","MultiSelect",True)
+	Gui.[v.Args.mainFormName].[v.Args.maingridName].SetGridviewProperty("gvMain","AllowSort",True)
+	Gui.[v.Args.mainFormName].[v.Args.maingridName].SetGridviewProperty("gvMain","AllowFilter",True)
+	Gui.[v.Args.mainFormName].[v.Args.maingridName].setGridViewProperty("gvMain","OptionsDetailShowDetailTabs",False)
+	Gui.[v.Args.mainFormName].[v.Args.maingridName].SetGridviewProperty("gvMain","OptionsViewShowGroupPanel",True)
+	
+	'MinWidths
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber","minwidth","135")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","minwidth","30")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","minwidth","30")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Description-Primary","minwidth","175")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-SALESORDER-CUSTOMER-CUSTOMERNUMBER","minwidth","85")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Billing-Address-Name","minwidth","150")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-AreaCode","minwidth","55")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","InvoiceNumber","minwidth","60")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderNumber","minwidth","60")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderLineNumber","minwidth","60")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-SALESORDER-INFORMATION-CUSTOMERPURCHASEORDERNUMBER","minwidth","105")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Information-InvoiceDate","minwidth","80")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-Quantity-Shipped","minwidth","95")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","minwidth","95")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Total_Cost","minwidth","95")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","minwidth","95")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","minwidth","95")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","profit","minwidth","95")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Margin","minwidth","75")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-State","minwidth","45")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode","minwidth","45")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-ISTAXABLE","minwidth","65")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate","minwidth","80")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","minwidth","40")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode","minwidth","70")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Information-Type","minwidth","70")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description","minwidth","95")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-DELIVERY-TRACKING-TRACKINGNUMBER","minwidth","130")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Material-MonetaryValue-Company-Unit","minwidth","95")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","minwidth","95")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","minwidth","95")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","minwidth","95")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","minwidth","95")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Other-MonetaryValue-Company-Unit","minwidth","95")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridName].setColumnProperty("gvMain","Invoice-Shipment-SalesOrderShipTo-Shipping-Address-Name","minwidth","150")
+	
+	'CellHAlignments
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","cellHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","cellHAlignment","Center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-SALESORDER-CUSTOMER-CUSTOMERNUMBER","cellHAlignment","center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","InvoiceNumber","cellHAlignment","center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderNumber","cellHAlignment","center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderLineNumber","cellHAlignment","center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Information-InvoiceDate","cellHAlignment","center")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","cellHAlignment","Center")
+	
+	'CellForeColors
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","InvoiceNumber","cellForeColor","blue")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderNumber","cellForeColor","blue")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderLineNumber","cellFOreColor","blue")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Margin","cellForeColor","Blue")
+	
+	'DisplayCustomDateTimes
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Information-InvoiceDate","displayCustomDateTime","d")
+	
+	'DisplayFormatTypes
+	Gui.[v.Args.mainFormName].[v.Args.mainGridName].setColumnProperty("gvMain","Material-MonetaryValue-Company-Unit","displayFormatType","numeric")
+	
+	'DisplayCustomNumerics
+	Gui.[v.Args.mainFormName].[v.Args.maingridName].SetColumnProperty("gvMain","Margin","DisplayCustomNumeric","#0.0#%")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-Quantity-Shipped","displayCustomNumeric","###,###,##0.##")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Material-MonetaryValue-Company-Unit","displayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","displayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","displayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","displayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","displayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Other-MonetaryValue-Company-Unit","DisplayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","DisplayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","DisplayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","DisplayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Total_Cost","DisplayCustomNumeric","$###,###,##0.00")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Profit","DisplayCustomNumeric","$###,###,##0.00")
+	
+	'VisibleIndexes
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber","visibleIndex","0")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","visibleIndex","1")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","visibleIndex","2")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Description-Primary","visibleIndex","3")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-SALESORDER-CUSTOMER-CUSTOMERNUMBER","visibleIndex","4")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrder-Billing-Address-Name","visibleIndex","5")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Invoice-Shipment-SalesOrderShipTo-Shipping-Address-Name","visibleIndex","6")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-AreaCode","visibleIndex","7")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","InvoiceNumber","visibleIndex","8")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderNumber","visibleIndex","9")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SalesOrderLineNumber","visibleIndex","10")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-SALESORDER-INFORMATION-CUSTOMERPURCHASEORDERNUMBER","visibleIndex","11")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Information-InvoiceDate","visibleIndex","12")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-Quantity-Shipped","visibleIndex","13")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","visibleIndex","14")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Total_Cost","visibleIndex","15")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","visibleIndex","16")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","visibleIndex","17")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Profit","visibleIndex","18")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Margin","visibleIndex","19")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","visibleIndex","20")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode","visibleIndex","21")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].SetColumnProperty("gvMain","SHIPMENT-DELIVERY-TRACKING-TRACKINGNUMBER","visibleIndex","22")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Material-MonetaryValue-Company-Unit","visibleIndex","23")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","visibleIndex","24")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","visibleIndex","25")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","visibleIndex","26")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","visibleIndex","27")
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Other-MonetaryValue-Company-Unit","visibleIndex","28")
+	
+	Gui.[v.args.mainFormName].[v.args.mainGridName].AddSummaryItem("gvMain","ShipmentLine-Quantity-Shipped","ShipmentLine-Quantity-Shipped","Sum","","","c2")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].AddSummaryItem("gvMain","Total_Cost","Total_Cost","Sum","","","c2")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].AddSummaryItem("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","Sum","","","c2")
+	Gui.[v.args.mainFormName].[v.args.mainGridName].AddSummaryItem("gvMain","Profit","Profit","Sum","","","c2")
+	
+Program.Sub.setColumnCellFormat.End
+
+Program.Sub.setColumnAllowEdit.Start
+	
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+
+	'MainGridName
+	Function.Intrinsic.Control.CallSub(getMainGridName)
+
+	'AllowEdits
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Description-Primary","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrder-Customer-CustomerNumber","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrder-Billing-Address-Name","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-AreaCode","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","InvoiceNumber","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","SalesOrderNumber","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","SalesOrderLineNumber","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Information-InvoiceDate","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-Quantity-Shipped","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Margin","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-State","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-ISTAXABLE","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Information-Type","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Material-MonetaryValue-Company-Unit","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Other-MonetaryValue-Company-Unit","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrder-Information-CustomerPurchaseOrderNumber","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-Delivery-Tracking-TrackingNumber","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","WorkOrderNumber","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","WorkOrderSuffix","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Total_Cost","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Profit","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","WO","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","WOStatus","allowEdit",False)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Margin","allowEdit",False)
+
+	'ReadOnly's
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-LocationCode","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Information-ProductLine-ProductLineCode","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Description-Primary","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrder-Customer-CustomerNumber","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrder-Billing-Address-Name","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-AreaCode","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","InvoiceNumber","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","SalesOrderNumber","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","SalesOrderLineNumber","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Information-InvoiceDate","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-Quantity-Shipped","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Part-Cost-MonetaryValue-Company-Unit","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Pricing-MonetaryValue-Company-Discounted","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","SHIPMENTLINE-SALESORDERLINE-PRICING-MONETARYVALUE-COMPANY-EXTENDED","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Margin","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-State","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-taxAuthorityCode","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-ISTAXABLE","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Tax-Authorities-0-Rate","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrderShipTO-Customer-Sales-SalesPerson-SalesPersonCode","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrderShipTo-Accounting-Branch-BranchCode","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","ShipmentLine-SalesOrderLine-Information-Type","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrderShipTo-Delivery-ARShipVia-Information-Description","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Material-MonetaryValue-Company-Unit","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Labor-MonetaryValue-Company-Unit","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Overhead-MonetaryValue-Company-Unit","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Outside-MonetaryValue-Company-Unit","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Freight-MonetaryValue-Company-Unit","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Other-MonetaryValue-Company-Unit","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-SalesOrder-Information-CustomerPurchaseOrderNumber","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Shipment-Delivery-Tracking-TrackingNumber","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","WorkOrderNumber","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","WorkOrderSuffix","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Total_Cost","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Profit","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","WO","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","WOStatus","readOnly",True)
+	Gui.[v.Args.mainFormName].[v.Args.mainGridname].setcolumnProperty("gvMain","Margin","readOnly",True)
+Program.Sub.setColumnAllowEdit.End
+
+Program.Sub.SetGridProperties.Start
+Program.Sub.setGridProperties.End
+
+Program.Sub.setCaptions.Start
+Program.Sub.setCaptions.End
+
+Program.Sub.CannyCheckUser.Start
+Program.Sub.CannyCheckUser.End
+
+Program.Sub.ResetGridSerialization.Start
+Program.Sub.ResetGridSerialization.End
+
+Program.Sub.getDashboardName.Start
+'@ Return DashboardName	: String
+	v.Local.sDashboardTitle.Declare
+	
+	f.Intrinsic.String.Concat("Sales History Dashboard (",v.Caller.CompanyCode,")",v.Local.sDashboardTitle)
+	'Return
+	Function.Intrinsic.Variable.AddRV("DashboardName",v.Local.sDashboardTitle)		
+Program.Sub.getDashboardName.End
+
+Program.Sub.MainRowCellClick.Start
+	v.Local.sPar1.Declare(String, "")
+	v.Local.sPar2.Declare(String, "")
+	v.Local.sPar3.Declare(String, "")
+	v.Local.sPar4.Declare(String, "")
+	v.Local.sParams.Declare(String, "")
+	v.Local.sinvoice.Declare(String, "")
+
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+	
+	'MainGridName
+	Function.Intrinsic.Control.CallSub(getMainGridName)
+
+	Function.Intrinsic.Control.SelectCase(v.Args.Column)
+
+	Function.Intrinsic.Control.CaseAny("InvoiceNumber","INVOICENUMBER")
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain",v.Args.column,v.args.row,V.Local.sInvoice)
+		F.Global.General.CallWrapperSync(200700,V.Local.sInvoice)
+
+	Function.Intrinsic.Control.CaseAny("SalesOrderNumber","SalesOrderLineNumber","SALESORDERNUMBER","SALESORDERLINENUMBER")
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","SalesOrderNumber",v.args.row,V.Local.sPar1)
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","SalesOrderLineNumber",v.args.row,v.Local.sPar2)
+		Function.Intrinsic.String.Build("{0}!*!{1}",v.Local.sPar1,v.Local.sPar2,v.Local.sParams)
+		Function.Global.General.CallWrapperAsync(7070,v.Local.sParams)
+
+	Function.Intrinsic.Control.CaseAny("WO")   
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","WOStatus",v.args.row,V.Local.sPar1)
+		
+		Function.Intrinsic.Control.If(v.Local.sPar1,=,"ACTIVE")
+			Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","WorkOrderNumber",v.args.row,V.Local.sPar1)
+			Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","WorkOrderSuffix",v.args.row,V.Local.sPar2)
+			Function.Intrinsic.String.Build("7!*!{0}!*!{1}!*!A",v.Local.sPar1,v.Local.sPar2,v.Local.sParams)
+			Function.Global.General.CallWrapperAsync(450000,V.Local.sParams)
+		
+		Function.Intrinsic.Control.ElseIf(v.Local.sPar1,=,"HISTORY")
+			Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","WorkOrderNumber",v.args.row,V.Local.sPar1)
+			Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","WorkOrderSuffix",v.args.row,V.Local.sPar2)
+			Function.Intrinsic.String.Build("7!*!{0}!*!{1}!*!A",v.Local.sPar1,v.Local.sPar2,v.Local.sParams)
+			Function.Global.General.CallWrapperAsync(450000,V.Local.sParams)
+		
+		Function.Intrinsic.Control.Else
+			Function.Intrinsic.UI.Msgbox("Work Order Not Found")
+		Function.Intrinsic.Control.EndIf
+
+	Function.Intrinsic.Control.CaseAny("Margin","MARGIN")
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","InvoiceNumber",v.args.row,V.Local.sPar1)
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","ShipmentLine-SalesOrderLine-Part-PartNumber",v.args.row,V.Local.sPar2)
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","Invoice-Shipment-SalesOrderShipTo-Shipping-Address-Name",v.args.row,V.Local.sPar3)
+		F.Intrinsic.String.Build("Customer: {0}{3}Invoice: {1}{3}Part: {2}",V.local.sPar3.RTrim,V.Local.sPar1.RTrim,V.Local.sPar2.RTrim,V.Ambient.NewLine,V.Local.sPar1)
+
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","Total_Cost",v.args.row,V.Local.sPar2)
+		Gui.[v.Args.mainFormName].[v.Args.mainGridName].GetCellValueByColumnName("gvMain","Profit",v.args.row,V.Local.sPar3)
+		F.Intrinsic.String.Build("Total Cost*!*Profit!*!{0}*!*{1}",V.Local.sPar2,V.local.sPar3,V.Local.sPar2)
+		
+		Gui.frmProfit.GsChartProfit.ClearChart
+		Gui.frmProfit.GsChartProfit.CreatePieChart(V.Local.sPar1,"Margin",V.Local.sPar2)
+		Gui.frmProfit.GsChartProfit.SetChartProperty("LEGEND","","Visible",-1,False)
+		Gui.frmProfit..visible(true)
+
+	Function.Intrinsic.Control.EndSelect
+
+Program.Sub.MainRowCellClick.End
+
+Program.Sub.frmProfit_UnLoad.Start
+	Gui.frmProfit..Visible(False)
+Program.Sub.frmProfit_UnLoad.End
