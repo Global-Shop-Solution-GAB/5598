@@ -1,0 +1,349 @@
+Program.Sub.Preflight.Start
+	Function.Intrinsic.Control.CallSub(Require, "subname", "BuildDatatables")
+	Function.Intrinsic.Control.CallSub(Require, "subname", "BuildDataviews")
+	Function.Intrinsic.Control.CallSub(Require, "subname", "BuildGridviews")
+	Function.Intrinsic.Control.CallSub(Require, "subname", "CloseDataConnections")
+	Function.Intrinsic.Control.CallSub(Require, "subname", "CannyCheckUser")
+	Function.Intrinsic.Control.CallSub(Require, "subname", "ResetGridSerialization")
+	Function.Intrinsic.Control.CallSub(Require, "subname", "GetDashboardName")
+Program.Sub.Preflight.End
+
+Program.Sub.ScreenSU.Start
+
+	'Form
+	Gui.FMain..Create
+	Gui.FMain..Caption("Dashboard Template")
+	Gui.FMain..Size(15330,10635)
+	Gui.FMain..MinX(0)
+	Gui.FMain..MinY(0)
+	Gui.FMain..Position(0,0)
+	Gui.FMain..BackColor(-2147483633)
+	Gui.FMain..MousePointer(0)
+	Gui.FMain..Event(UnLoad,FMain_UnLoad)
+	gui.FMain..MinX(12990)
+	gui.FMain..MinY(10545)
+
+	'caption
+	Function.Intrinsic.Control.CallSub(AddCaption)
+
+	'gcMainGrid
+	Function.Intrinsic.Control.CallSub(AddGcMainGrid)
+
+	'pbStatus
+	Gui.FMain.pbStatus.Create(ProgressBar)
+	Gui.FMain.pbStatus.Size(3735,255)
+	Gui.FMain.pbStatus.Position(11280,1335)
+	Gui.FMain.pbStatus.Visible(False)
+	'Scrolling arguments: 1 = continuous (i.e. load from min to max)
+	'					  2 = marquis    (i.e. looping scrolling)
+	Gui.FMain.pbStatus.scrolling(2)
+
+	'lblStatus
+	Gui.FMain.lblStatus.Create(Label,"Label",False,1935,255,0,11295,1110,True,0,"Arial",8,-2147483633,0)
+
+	'ContextMenu
+	Function.Intrinsic.Control.CallSub(AddContextMenu)
+
+	'Images
+	Function.Intrinsic.Control.CallSub(AddGssIcon)
+	Function.Intrinsic.Control.CallSub(AddGssLogo)
+
+	'Canny
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+	F.Intrinsic.Control.CallSub(CannyCheckUser,"Form",Variable.Args.MainFormName)
+Program.Sub.ScreenSU.End
+
+Program.Sub.InitializeDashboard.Start
+
+	Function.Intrinsic.Control.CallSub(PrepareData)
+	Function.Intrinsic.Control.CallSub(PrepareGrids)
+
+Program.Sub.InitializeDashboard.End
+
+Program.Sub.ShowDashboard.Start
+
+	'FormName
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+
+	gui.[Variable.Args.MainFormName]..Show
+Program.Sub.ShowDashboard.End
+
+Program.Sub.AddCaption.Start
+
+	'DashboardName
+	f.Intrinsic.Control.CallSub(GetDashboardName)
+
+	'MainFormName
+	f.Intrinsic.Control.CallSub(GetMainFormName)
+
+	gui.[Variable.Args.MainFormName]..Caption(v.Args.DashboardName)
+Program.Sub.AddCaption.End
+
+Program.Sub.AddGcMainGrid.Start
+
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+
+	'gcMainGrid
+	Gui.[Variable.Args.MainFormName].gcMainGrid.Create(GsGridControl)
+	Gui.[Variable.Args.MainFormName].gcMainGrid.Size(14940,8505)
+	Gui.[Variable.Args.MainFormName].gcMainGrid.Position(105,1635)
+	Gui.[Variable.Args.MainFormName].gcMainGrid.Anchor(15)
+	Gui.[Variable.Args.MainFormName].gcMainGrid.Event(RowCellClick, gcMainGrid_RowCellClick)
+
+Program.Sub.AddGcMainGrid.End
+
+Program.Sub.AddGssIcon.Start
+
+	'sIcon
+	v.Local.sIcon.Declare
+	F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,v.Local.sIcon)
+
+	'FormName
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+
+	Gui.[Variable.Args.MainFormName]..Icon(V.Local.sIcon)
+Program.Sub.AddGssIcon.End
+
+Program.Sub.AddGssLogo.Start
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+
+	'picGssLogo
+	Gui.[Variable.Args.MainFormName].picGssLogo.Create(PictureBox)
+	Gui.[Variable.Args.MainFormName].picGssLogo.Size(4125,960)
+	Gui.[Variable.Args.MainFormName].picGssLogo.Position(5580,45)
+	Gui.[Variable.Args.MainFormName].picGssLogo.Event(DblClick, picGSSLogo_DblClick)
+
+	'sGssLogo
+	v.Local.sGssLogo.Declare
+	F.Intrinsic.String.Build("{0}\ART\GAB_GSS_Logo_Green_Dash.png",V.Caller.GlobalDir,V.Local.sGssLogo)
+	Gui.[Variable.Args.MainFormName].picGssLogo.Picture(V.Local.sGssLogo)
+	Function.Intrinsic.Control.CallSub(setAnchor, "sControl", "picGssLogo", "iAnchorMode", 1)
+Program.Sub.AddGssLogo.End
+
+Program.Sub.picGSSLogo_DblClick.Start
+	Function.Intrinsic.Control.CallSub(LaunchGssWebsite)
+Program.Sub.picGSSLogo_DblClick.End
+
+Program.Sub.PrepareData.Start
+	Function.Intrinsic.Control.CallSub(BuildDatatables)
+	Function.Intrinsic.Control.CallSub(BuildDataViews)
+Program.Sub.PrepareData.End
+
+Program.Sub.PrepareGrids.Start
+	Function.Intrinsic.Control.CallSub(BuildGridviews)
+Program.Sub.PrepareGrids.End
+
+Program.Sub.AddContextMenu.Start
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+
+	'MainGridName
+	Function.Intrinsic.Control.CallSub(GetMainGridName)
+
+	'Create/ Attach the context menu
+	Gui.[v.Args.MainFormName]..ContextMenuCreate("ctxAll")
+	Gui.[v.Args.MainFormName].[v.args.MainGridName].ContextMenuAttach("ctxAll")
+
+	'Add Items
+	Gui.[v.Args.MainFormName]..ContextMenuAddItem("ctxAll","Refresh",0,"Refresh")
+	Gui.[v.Args.MainFormName]..ContextMenuAddItem("ctxAll","Export",0,"Export")
+	Gui.[v.Args.MainFormName]..ContextMenuAddItem("ctxAll","ResetColumns",0,"Reset Columns")
+
+	'Set Event Handlers
+	Gui.[v.Args.MainFormName]..ContextMenuSetItemEventHandler("ctxAll","Refresh","MenuClickRefresh")
+	Gui.[v.Args.MainFormName]..ContextMenuSetItemEventHandler("ctxAll","Export","MenuClickExport")
+	Gui.[v.Args.MainFormName]..ContextMenuSetItemEventHandler("ctxAll","ResetColumns","MenuClickResetColumns")
+Program.Sub.AddContextMenu.End
+
+Program.Sub.gcMainGrid_RowCellClick.Start
+'Todo
+Function.Intrinsic.Control.CallSub(MAINrowCellClick,"column",v.Args.column,"row",v.Args.rowIndex)
+Program.Sub.gcMainGrid_RowCellClick.End
+
+Program.Sub.MenuClickRefresh.Start
+'Todo
+	Function.Intrinsic.Control.CallSub(getMainFormName)
+	gui.[v.Args.MainFormName].cmdRefresh.enabled(false)
+	Function.Global.General.callsub(refreshDash)
+	gui.[v.Args.MainFormName].cmdRefresh.enabled(true)	
+Program.Sub.MenuClickRefresh.End
+
+Program.Sub.menuClickExport.Start
+
+	Function.Intrinsic.Control.CallSub(GetExportFilePath)
+
+	Function.Intrinsic.Control.CallSub(exportDashboardToFile, "filePath", Variable.Args.ExportFilePath)
+
+	Function.Intrinsic.Control.CallSub(LaunchFileIfExists, "filePath", Variable.Args.ExportFilePath)
+
+Program.Sub.menuClickExport.End
+
+Program.Sub.GetExportFilePath.Start
+'@ Return ExportFilePath	: String
+
+	'FileName
+	Variable.Local.FileName.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetExportFileName)
+	Function.Intrinsic.File.MakeFilenameFriendly(Variable.Args.ExportFileName, V.Local.FileName)
+
+	'FilePath
+	V.Local.FilePath.Declare(String, "{0}\{1}")
+	Function.Intrinsic.String.Build(V.Local.FilePath, V.Caller.LocalGssTempDir, V.Local.FileName, V.Local.FilePath)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ExportFilePath", V.Local.FilePath)
+Program.Sub.GetExportFilePath.End
+
+Program.Sub.GetExportFileName.Start
+'@ Return ExportFileName	: String
+
+	'ReportName
+	Function.Intrinsic.Control.CallSub(GetExportDashboardName)
+
+	'FileExtension
+	Function.Intrinsic.Control.CallSub(GetExportFileExtension)
+
+	'FileName
+	V.Local.FileName.Declare(String, "GAB_{0}_{1}.{2}")
+	
+	F.Intrinsic.String.Build(V.Local.FileName, Variable.Args.ReportName, Variable.Ambient.Now,  Variable.Args.ExportFileExtension, V.Local.FileName)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ExportFileName", V.Local.FileName)
+Program.Sub.GetExportFileName.End
+
+Program.Sub.GetExportFileExtension.Start
+'@ Return ExportFileExtension	: String
+
+	'ExportFileExtension
+	Variable.Local.ExportFileExtension.Declare(String)
+
+	'ExcelIsPresent
+	Function.Intrinsic.Control.CallSub(CheckExcelIsPresent)
+
+	Function.Intrinsic.Control.If(Variable.Args.ExcelIsPresent)
+		Variable.Local.ExportFileExtension.Set("xlsx")
+	Function.Intrinsic.Control.Else
+		Variable.Local.ExportFileExtension.Set("csv")
+	Function.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ExportFileExtension", Variable.Local.ExportFileExtension)
+	'Function.Intrinsic.Variable.AddRV("ExportFileExtension",".csv")
+Program.Sub.GetExportFileExtension.End
+
+Program.Sub.exportDashboardToFile.Start
+'@ Arg filePath	: String
+
+	'MainFormName
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+	
+	'MainGridName
+	Function.Intrinsic.Control.CallSub(GetMainGridName)
+
+	Function.Intrinsic.Control.CallSub(ExportGridToFile, "FormName", Variable.Args.MainFormName, "GridName", Variable.Args.MainGridName, "FilePath", Variable.Args.FilePath)
+Program.Sub.exportDashboardToFile.End
+
+Program.Sub.GetExportDashboardName.Start	
+'@ Return ReportName
+
+	'ReportName
+	Variable.Local.ReportName.Declare(String)
+	Function.Intrinsic.Control.CallSub(GetDashboardName)
+	Variable.Local.ReportName.Set(Variable.Args.DashboardName)
+	Function.Intrinsic.String.Replace(Variable.Local.ReportName, " ", "_", Variable.Local.ReportName)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("ReportName", Variable.Local.ReportName)
+Program.Sub.GetExportDashboardName.End
+
+Program.Sub.menuClickResetColumns.Start
+	Function.Intrinsic.Control.CallSub(ResetGridSerialization)
+Program.Sub.menuClickResetColumns.End
+
+Program.Sub.getPermissions.Start
+'@ Return CreatePermission	: Boolean True is user has permission, false otherwise
+'@ Return ViewPermission	: Boolean True is user has permission, false otherwise
+'@ Return EditPermission	: Boolean True is user has permission, false otherwise
+'@ Return DeletePermission	: Boolean True is user has permission, false otherwise
+
+	Variable.Local.CreatePermission.Declare(Boolean, False)
+	Variable.Local.ViewPermission.Declare(Boolean, False)
+	Variable.Local.EditPermission.Declare(Boolean, False)
+	Variable.Local.DeletePermission.Declare(Boolean, False)
+
+	'Todo: replace with logic/ function call to check what views/modes the user has permissions to.
+	Variable.Local.CreatePermission.Set(True)
+	Variable.Local.ViewPermission.Set(True)
+	Variable.Local.EditPermission.Set(True)
+	Variable.Local.DeletePermission.Set(True)
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("CreatePermission", Variable.Local.CreatePermission)
+	Function.Intrinsic.Variable.AddRV("ViewPermission", Variable.Local.ViewPermission)
+	Function.Intrinsic.Variable.AddRV("EditPermission", Variable.Local.EditPermission)
+	Function.Intrinsic.Variable.AddRV("DeletePermission", Variable.Local.DeletePermission)
+Program.Sub.getPermissions.End
+
+Program.Sub.checkLongPart.Start
+'@ Return bLongPart	: Boolean
+
+	'bLongPart
+	Variable.Local.bLongPart.Declare(Boolean)
+	F.Global.General.ReadOption("400861",0,False,"0000",V.Local.bLongPart)
+
+	F.Intrinsic.Control.If(V.Local.bLongPart.Not)
+		F.Global.General.ReadOption("400861",0,False,"0004",V.Local.bLongPart)
+	F.Intrinsic.Control.EndIf
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("bLongPart", V.Local.bLongPart)
+Program.Sub.checkLongPart.End
+
+Program.Sub.GetMainFormName.Start
+'@ Return	MainFormName	: String
+	Function.Intrinsic.Variable.AddRV("MainFormName", "FMain")
+Program.Sub.GetMainFormName.End
+
+Program.Sub.GetMainGridName.Start
+'@ Return MainGridName	: String
+
+	'Return
+	Function.Intrinsic.Variable.AddRV("MainGridName", "gcMainGrid")
+Program.Sub.GetMainGridName.End
+
+Program.Sub.FMain_UnLoad.Start
+	Function.Intrinsic.Control.CallSub(CloseDataConnections)
+	f.Intrinsic.Control.End
+Program.Sub.FMain_UnLoad.End
+
+Program.Sub.setAnchor.Start
+'@ Arg sControl	: String = Name of the control to set the anchor for
+'@ Arg iAnchorMode	: Long = Value to set for the anchor. 1 = top,
+														' 2 = bottom,
+														' 4 = left,
+														' 8 = right,
+														' 15 = top, right, bottom, left
+	Function.Intrinsic.Control.CallSub(GetMainFormName)
+	Gui.[v.args.mainformName].[v.Args.sControl].anchor(v.Args.iAnchorMode)
+Program.Sub.setAnchor.End
+
+Program.Sub.SetGridProperties.Start
+	Gui.[Variable.Args.MainFormName].[Variable.Args.MainGridName].SetGridViewProperty("maingridview", "MultiSelect",True)
+	Gui.[Variable.Args.MainFormName].[Variable.Args.MainGridName].SetGridViewProperty("maingridview", "OptionBehaviorEditable",True)
+	Gui.[Variable.Args.MainFormName].[Variable.Args.MainGridName].SetGridViewProperty("maingridview", "AllowSort",True)
+	Gui.[Variable.Args.MainFormName].[Variable.Args.MainGridName].SetGridViewProperty("maingridview", "AllowFilter",True)
+	Gui.[Variable.Args.MainFormName].[Variable.Args.MainGridName].SetGridViewProperty("maingridview", "OptionsDetailShowDetailTabs",False)
+	Gui.[Variable.Args.MainFormName].[Variable.Args.MainGridName].SetGridViewProperty("maingridview", "OptionsViewShowGroupPanel",True)
+	'Gui.[Variable.Args.MainFormName].[Variable.Args.MainGridName].SetGridViewProperty("maingridview", "OptionsViewColumnAutoWidth",True)
+Program.Sub.SetGridProperties.end
+
+Program.Sub.AlertSuccessfulExport.Start
+
+	'DashboardName
+	Function.Intrinsic.Control.CallSub(GetDashboardName)
+
+	Function.Intrinsic.UI.MsgBox("Exported successfully.", Variable.Args.DashboardName)
+Program.Sub.AlertSuccessfulExport.End
